@@ -1,10 +1,66 @@
 <!DOCTYPE html>
 <html>
 
-<body style="width: 200px; padding: 20px;">
-  <button id="toggleSidebar">Toggle Sidebar</button>
-  <div id="status">Click to toggle</div>
+<head>
+  <style>
+    body {
+      width: 200px;
+      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    .header {
+      margin-bottom: 20px;
+    }
+
+    .title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+
+    .subtitle {
+      font-size: 12px;
+      color: #666;
+    }
+
+    .master-toggle {
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 15px;
+      font-size: 16px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      background: #4285f4;
+      color: white;
+    }
+
+    .master-toggle:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+
+    .status {
+      font-size: 14px;
+      color: #666;
+      text-align: center;
+      margin-bottom: 15px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="header">
+    <div class="title">AI-Powered Feedback Analyzer</div>
+    <div class="subtitle">CS Thesis - AI-Powered Feedback Analyzer for Enhancing Teaching Strategies in Digital
+      Classrooms</div>
+  </div>
+
+  <button id="masterToggle" class="master-toggle">Enable Analyzer</button>
+  <div id="status" style="text-align: center;">Disabled</div>
+
+  <script src="popup.js"></script>
 </body>
-<script src="popup.js"></script>
 
 </html>

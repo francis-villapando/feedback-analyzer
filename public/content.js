@@ -1,14 +1,70 @@
 let sidebarVisible = false;
 let sidebar = null;
 let mainContainer = null;
+let jitsiToggleBtn = null;
+let masterEnabled = false;
 
+// Listen for messages from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === "toggleSidebar") {
-    toggleSidebar();
-    sendResponse({ success: true });
+  if (request.action === "toggleMaster") {
+    masterEnabled = !masterEnabled;
+    if (masterEnabled) {
+      injectJitsiToggleButton();
+    } else {
+      removeJitsiToggleButton();
+    }
+    sendResponse({ success: true, isEnabled: masterEnabled });
+  } else if (request.action === "getState") {
+    sendResponse({ isEnabled: masterEnabled });
   }
+  return true; // Indicates we will send a response synchronously or asynchronously
 });
 
+function injectJitsiToggleButton() {
+  const toolbar = document.querySelector('.toolbox-content-items');
+  if (!toolbar || jitsiToggleBtn) return;
+
+  // Clone Jitsi's exact button structure
+  jitsiToggleBtn = document.createElement('div');
+  jitsiToggleBtn.className = 'toolbox-button';
+  jitsiToggleBtn.setAttribute('role', 'button');
+  jitsiToggleBtn.setAttribute('tabindex', '0');
+  jitsiToggleBtn.setAttribute('aria-disabled', 'false');
+  jitsiToggleBtn.style.cursor = 'pointer';
+
+  // Inner structure matching Jitsi exactly
+  jitsiToggleBtn.innerHTML = `
+    <div style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: inherit; overflow: hidden;">
+      <img src="${chrome.runtime.getURL('icon32.png')}" 
+           style="width: 100%; height: 100%; object-fit: cover; display: block; border-radius: inherit;" 
+           aria-hidden="true">
+    </div>
+  `;
+
+  // Add click handler to the outer div (matches Jitsi's pattern)
+  jitsiToggleBtn.addEventListener('click', toggleSidebar);
+
+  // Jitsi hover effects
+  jitsiToggleBtn.addEventListener('mouseenter', () => {
+    jitsiToggleBtn.style.background = 'rgba(0,0,0,0.1)';
+  });
+  jitsiToggleBtn.addEventListener('mouseleave', () => {
+    jitsiToggleBtn.style.background = '';
+  });
+
+  toolbar.appendChild(jitsiToggleBtn);
+  console.log('Feedback analyzer button injected');
+}
+
+function removeJitsiToggleButton() {
+  if (jitsiToggleBtn) {
+    jitsiToggleBtn.remove();
+    jitsiToggleBtn = null;
+  }
+  hideSidebar(); // Also hide sidebar when disabling
+}
+
+// Rest of your existing showSidebar/hideSidebar functions stay THE SAME
 function toggleSidebar() {
   if (sidebarVisible) {
     hideSidebar();
@@ -42,7 +98,6 @@ function showSidebar() {
 
   document.body.appendChild(sidebar);
   sidebarVisible = true;
-  console.log('White sidebar injected');
 }
 
 function hideSidebar() {
@@ -54,6 +109,3 @@ function hideSidebar() {
   }
   sidebarVisible = false;
 }
-
-// Auto-cleanup
-window.addEventListener('unload', hideSidebar);

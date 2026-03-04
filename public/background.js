@@ -1,3 +1,3 @@
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('Jitsi AI Sidebar installed');
+  console.log('Jitsi AI-powered feedback analyzer installed');
 });
