@@ -8,7 +8,8 @@ let masterEnabled = false;
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   const hasToolbox = !!document.getElementById('new-toolbox');
   const hasPrejoin = !!document.querySelector('[data-testid="prejoin.joinMeeting"]');
-  const isMeetingActive = hasToolbox && !hasPrejoin;
+  const hasLogin = !!document.querySelector('[data-testid="lobby.loginButton"]');
+  const isMeetingActive = hasToolbox && !hasPrejoin && !hasLogin;
 
   if (request.action === "toggleMaster") {
     if (!isMeetingActive) {
