@@ -6,13 +6,31 @@
   "icons": {
     "32": "icon32.png"
   },
-  "action": {
-    "default_popup": "index.html"
-  },
   "permissions": [
-    "scripting"
+    "activeTab",
+    "storage"
   ],
   "host_permissions": [
     "https://meet.jit.si/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://meet.jit.si/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "styles.css"
+      ],
+      "run_at": "document_idle"
+    }
   ]
 }
