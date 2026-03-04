@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "version": "1.0.0",
+  "name": "Feedback Analyzer",
+  "description": "AI-Powered Feedback Analyzer for Enhancing Teaching Strategies in Digital Classrooms.",
+  "icons": {
+    "32": "icon32.png"
+  },
+  "action": {
+    "default_popup": "index.html"
+  },
+  "permissions": [
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://meet.jit.si/*"
+  ]
+}
