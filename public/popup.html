@@ -1,64 +1,57 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
-  <style>
-    body {
-      width: 200px;
-      padding: 20px;
-      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-    }
-
-    .header {
-      margin-bottom: 20px;
-    }
-
-    .title {
-      font-size: 18px;
-      font-weight: 600;
-      margin-bottom: 5px;
-    }
-
-    .subtitle {
-      font-size: 12px;
-      color: #666;
-    }
-
-    .master-toggle {
-      width: 100%;
-      padding: 12px;
-      margin-bottom: 15px;
-      font-size: 16px;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      background: #4285f4;
-      color: white;
-    }
-
-    .master-toggle:disabled {
-      background: #ccc;
-      cursor: not-allowed;
-    }
-
-    .status {
-      font-size: 14px;
-      color: #666;
-      text-align: center;
-      margin-bottom: 15px;
-    }
-  </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Feedback Analyzer</title>
+  <link rel="stylesheet" href="popup.css" />
 </head>
 
 <body>
-  <div class="header">
-    <div class="title">AI-Powered Feedback Analyzer</div>
-    <div class="subtitle">CS Thesis - AI-Powered Feedback Analyzer for Enhancing Teaching Strategies in Digital
-      Classrooms</div>
-  </div>
+  <div class="popup-container">
 
-  <button id="masterToggle" class="master-toggle">Enable Analyzer</button>
-  <div id="status" style="text-align: center;">Disabled</div>
+    <!-- Header -->
+    <div class="popup-header">
+      <img src="icon32.png" alt="Logo" class="popup-logo" />
+      <div class="popup-titles">
+        <div class="popup-title">Feedback Analyzer</div>
+        <div class="popup-subtitle">AI-Powered Feedback Analyzer for Enhancing Teaching Strategies in Digital
+          Classrooms</div>
+      </div>
+    </div>
+
+    <div class="popup-divider"></div>
+
+    <!-- Master Toggle -->
+    <div class="toggle-section">
+      <span class="toggle-label">Enable Analyzer</span>
+      <button id="masterToggle" class="toggle-btn" aria-label="Toggle Analyzer" disabled>
+        <span class="toggle-knob"></span>
+      </button>
+    </div>
+
+    <!-- Status -->
+    <div id="status" class="status-text">Please open Jitsi Meet first</div>
+
+    <div class="popup-divider"></div>
+
+    <!-- Privacy Info -->
+    <button id="privacyToggle" class="privacy-btn" aria-expanded="false">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="16" x2="12" y2="12"></line>
+        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+      </svg>
+      Privacy Notice
+    </button>
+    <div id="privacyPanel" class="privacy-panel">
+      <p>This extension processes meeting audio locally to analyze participant feedback. No audio or personal data is
+        sent to external servers. Data is only used to generate teaching insights during the active session.</p>
+    </div>
+
+  </div>
 
   <script src="popup.js"></script>
 </body>
