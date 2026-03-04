@@ -10,11 +10,11 @@ function setDisabledUI(message) {
   status.textContent = message;
 }
 
-function updateUI(isPrejoin = false) {
+function updateUI(isMeetingActive = true) {
   const btn = document.getElementById('masterToggle');
   const status = document.getElementById('status');
 
-  if (isPrejoin) {
+  if (!isMeetingActive) {
     setDisabledUI('Please join a meeting first');
     return;
   }
@@ -33,7 +33,6 @@ function updateUI(isPrejoin = false) {
   }
 }
 
-// Fetch initial state when popup opens
 chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
   if (!tabs[0] || !tabs[0].url || !tabs[0].url.includes('meet.jit.si')) {
     setDisabledUI('Please open Jitsi Meet first');
@@ -47,7 +46,7 @@ chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     }
     if (response !== undefined) {
       isEnabled = response.isEnabled;
-      updateUI(response.isPrejoin);
+      updateUI(response.isMeetingActive);
     }
   });
 });
@@ -66,7 +65,7 @@ document.getElementById('masterToggle').addEventListener('click', () => {
       }
       if (response) {
         isEnabled = response.isEnabled;
-        updateUI(response.isPrejoin);
+        updateUI(response.isMeetingActive);
       }
     });
   });

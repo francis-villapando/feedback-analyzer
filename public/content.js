@@ -6,11 +6,13 @@ let masterEnabled = false;
 
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  const isPrejoin = !!document.querySelector('[data-testid="prejoin.joinMeeting"]');
+  const hasToolbox = !!document.getElementById('new-toolbox');
+  const hasPrejoin = !!document.querySelector('[data-testid="prejoin.joinMeeting"]');
+  const isMeetingActive = hasToolbox && !hasPrejoin;
 
   if (request.action === "toggleMaster") {
-    if (isPrejoin) {
-      sendResponse({ success: false, isEnabled: masterEnabled, isPrejoin: true });
+    if (!isMeetingActive) {
+      sendResponse({ success: false, isEnabled: masterEnabled, isMeetingActive: false });
       return true;
     }
     masterEnabled = !masterEnabled;
@@ -19,18 +21,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     } else {
       removeJitsiToggleButton();
     }
-    sendResponse({ success: true, isEnabled: masterEnabled, isPrejoin: false });
+    sendResponse({ success: true, isEnabled: masterEnabled, isMeetingActive: true });
   } else if (request.action === "getState") {
-    sendResponse({ isEnabled: masterEnabled, isPrejoin: isPrejoin });
+    sendResponse({ isEnabled: masterEnabled, isMeetingActive: isMeetingActive });
   }
-  return true; // Indicates we will send a response synchronously or asynchronously
+  return true;
 });
 
 function injectJitsiToggleButton() {
   const toolbar = document.querySelector('.toolbox-content-items');
   if (!toolbar || jitsiToggleBtn) return;
 
-  // Clone Jitsi's exact button structure
+  // Match Jitsi's button structure
   jitsiToggleBtn = document.createElement('div');
   jitsiToggleBtn.className = 'toolbox-button';
   jitsiToggleBtn.setAttribute('role', 'button');
@@ -38,7 +40,7 @@ function injectJitsiToggleButton() {
   jitsiToggleBtn.setAttribute('aria-disabled', 'false');
   jitsiToggleBtn.style.cursor = 'pointer';
 
-  // Inner structure matching Jitsi exactly
+  // Match Jitsi's inner structure
   jitsiToggleBtn.innerHTML = `
     <div style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: inherit; overflow: hidden;">
       <img src="${chrome.runtime.getURL('icon32.png')}" 
@@ -47,10 +49,10 @@ function injectJitsiToggleButton() {
     </div>
   `;
 
-  // Add click handler to the outer div (matches Jitsi's pattern)
+  // Match Jitsi's click handler to the outer div
   jitsiToggleBtn.addEventListener('click', toggleSidebar);
 
-  // Jitsi hover effects
+  // Match Jitsi's hover effects
   jitsiToggleBtn.addEventListener('mouseenter', () => {
     jitsiToggleBtn.style.background = 'rgba(0,0,0,0.1)';
   });
@@ -67,10 +69,9 @@ function removeJitsiToggleButton() {
     jitsiToggleBtn.remove();
     jitsiToggleBtn = null;
   }
-  hideSidebar(); // Also hide sidebar when disabling
+  hideSidebar();
 }
 
-// Rest of your existing showSidebar/hideSidebar functions stay THE SAME
 function toggleSidebar() {
   if (sidebarVisible) {
     hideSidebar();
