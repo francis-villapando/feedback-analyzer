@@ -19,7 +19,7 @@ const sampleData = {
     { label: 'Pace too fast', feedbacks: [0, 1, 2, 3, 4] },
     { label: 'Needs traversal examples', feedbacks: [1] },
     { label: 'Needs notation review', feedbacks: [2] },
-    { label: 'Positive - recursion clear', feedbacks: [3] },
+    { label: 'Recursion clear', feedbacks: [3] },
     { label: 'Hash collision confusion', feedbacks: [4] },
   ],
   recommendations: [
@@ -83,6 +83,10 @@ function injectStyles() {
     .jai-item-text { flex: 1; }
     .jai-source-dot { position: relative; width: 18px; height: 18px; min-width: 18px; border-radius: 50%; background: rgba(46,125,50,0.12); border: 1px solid rgba(46,125,50,0.3); cursor: default; display: flex; align-items: center; justify-content: center; margin-top: 2px; }
     .jai-source-dot::after { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #2E7D32; }
+    .jai-source-dot.positive { background: rgba(66,133,244,0.12); border: 1px solid rgba(66,133,244,0.3); }
+    .jai-source-dot.positive::after { background: #4285F4; }
+    .jai-source-dot.negative { background: rgba(219,68,55,0.12); border: 1px solid rgba(219,68,55,0.3); }
+    .jai-source-dot.negative::after { background: #DB4437; }
     .jai-source-dot .jai-popup { top: 50%; transform: translateY(-50%) translateX(4px); right: 100%; margin-right: 8px; max-height: 150px; overflow-y: auto; }
     .jai-issue { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; background: #FFF3E0; border: 1px solid #FFE0B2; border-radius: 8px; margin-bottom: 6px; font-size: 13px; color: #E65100; line-height: 1.45; }
     .jai-issue svg { width: 16px; height: 16px; min-width: 16px; color: #E65100; margin-top: 1px; }
@@ -97,7 +101,7 @@ const icons = {
   warn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
 };
 
-// Helper function to build hover‑popup list
+// Helper function for hover‑popup list
 function popupList(items) {
   return `
     <div class="jai-popup">
@@ -105,9 +109,24 @@ function popupList(items) {
     </div>`;
 }
 
-// Setup popup hover behavior after sidebar is created
+// Helper function for theme type (will use proper NLP classification in the future)
+function getThemeType(label) {
+  const positiveKeywords = ['positive', 'good', 'great', 'clear', 'excellent', 'helpful'];
+  const negativeKeywords = ['confusion', 'confused', 'difficult', 'hard', 'fast', 'slow', 'needs', 'lack', 'missing', 'unclear', ' kulang', ' hirap', 'di ko'];
+  
+  const lowerLabel = label.toLowerCase();
+  
+  if (positiveKeywords.some(kw => lowerLabel.includes(kw))) {
+    return 'positive';
+  }
+  if (negativeKeywords.some(kw => lowerLabel.includes(kw))) {
+    return 'negative';
+  }
+  return '';
+}
+
+// Helper function for popup hover behavior
 function setupPopupHover() {
-  // Handle .jai-popup-trigger elements
   document.querySelectorAll('.jai-popup-trigger').forEach(trigger => {
     const popup = trigger.querySelector('.jai-popup');
     if (!popup) return;
@@ -115,7 +134,6 @@ function setupPopupHover() {
     let hideTimeout;
     const isSourceDot = trigger.classList.contains('jai-source-dot');
     
-    // Show popup on mouseenter
     trigger.addEventListener('mouseenter', () => {
       clearTimeout(hideTimeout);
       popup.style.opacity = '1';
@@ -123,7 +141,6 @@ function setupPopupHover() {
       popup.style.transform = isSourceDot ? 'translateY(-50%) translateX(0)' : 'translateX(0)';
     });
     
-    // Hide popup on mouseleave with delay
     trigger.addEventListener('mouseleave', () => {
       hideTimeout = setTimeout(() => {
         popup.style.opacity = '0';
@@ -132,14 +149,12 @@ function setupPopupHover() {
       }, 100);
     });
     
-    // Keep popup visible when hovering the popup itself
     popup.addEventListener('mouseenter', () => {
       clearTimeout(hideTimeout);
       popup.style.opacity = '1';
       popup.style.pointerEvents = 'auto';
     });
     
-    // Hide popup when leaving the popup
     popup.addEventListener('mouseleave', () => {
       hideTimeout = setTimeout(() => {
         popup.style.opacity = '0';
@@ -186,14 +201,17 @@ function createSidebar() {
 
       <div class="jai-section">
         <div class="jai-section-title">Feedback Themes</div>
-        ${themes.map(t => `
+        ${themes.map(t => {
+          const themeType = getThemeType(t.label);
+          const dotClass = themeType ? `jai-source-dot ${themeType}` : 'jai-source-dot';
+          return `
           <div class="jai-item">
             <span class="jai-item-text">${t.label}</span>
-            <div class="jai-source-dot jai-popup-trigger">
+            <div class="${dotClass} jai-popup-trigger">
               ${popupList(t.feedbacks.map(i => feedbacks[i]))}
             </div>
-          </div>
-        `).join('')}
+          </div>`;
+        }).join('')}
       </div>
 
       <div class="jai-section">
