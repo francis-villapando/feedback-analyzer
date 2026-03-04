@@ -6,16 +6,22 @@ let masterEnabled = false;
 
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  const isPrejoin = !!document.querySelector('[data-testid="prejoin.joinMeeting"]');
+
   if (request.action === "toggleMaster") {
+    if (isPrejoin) {
+      sendResponse({ success: false, isEnabled: masterEnabled, isPrejoin: true });
+      return true;
+    }
     masterEnabled = !masterEnabled;
     if (masterEnabled) {
       injectJitsiToggleButton();
     } else {
       removeJitsiToggleButton();
     }
-    sendResponse({ success: true, isEnabled: masterEnabled });
+    sendResponse({ success: true, isEnabled: masterEnabled, isPrejoin: false });
   } else if (request.action === "getState") {
-    sendResponse({ isEnabled: masterEnabled });
+    sendResponse({ isEnabled: masterEnabled, isPrejoin: isPrejoin });
   }
   return true; // Indicates we will send a response synchronously or asynchronously
 });

@@ -1,8 +1,26 @@
 let isEnabled = false;
 
-function updateUI() {
+function setDisabledUI(message) {
   const btn = document.getElementById('masterToggle');
   const status = document.getElementById('status');
+  btn.disabled = true;
+  btn.style.background = '#ccc';
+  btn.style.cursor = 'not-allowed';
+  btn.textContent = 'Enable Analyzer';
+  status.textContent = message;
+}
+
+function updateUI(isPrejoin = false) {
+  const btn = document.getElementById('masterToggle');
+  const status = document.getElementById('status');
+
+  if (isPrejoin) {
+    setDisabledUI('Please join a meeting first');
+    return;
+  }
+
+  btn.disabled = false;
+  btn.style.cursor = 'pointer';
 
   if (isEnabled) {
     btn.textContent = 'Disable Analyzer';
@@ -18,7 +36,7 @@ function updateUI() {
 // Fetch initial state when popup opens
 chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
   if (!tabs[0] || !tabs[0].url || !tabs[0].url.includes('meet.jit.si')) {
-    document.getElementById('status').textContent = 'Please open Jitsi Meet first';
+    setDisabledUI('Please open Jitsi Meet first');
     return;
   }
 
@@ -29,7 +47,7 @@ chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     }
     if (response !== undefined) {
       isEnabled = response.isEnabled;
-      updateUI();
+      updateUI(response.isPrejoin);
     }
   });
 });
@@ -37,7 +55,7 @@ chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
 document.getElementById('masterToggle').addEventListener('click', () => {
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     if (!tabs[0] || !tabs[0].url || !tabs[0].url.includes('meet.jit.si')) {
-      document.getElementById('status').textContent = 'Please open Jitsi Meet first';
+      setDisabledUI('Please open Jitsi Meet first');
       return;
     }
 
@@ -46,9 +64,9 @@ document.getElementById('masterToggle').addEventListener('click', () => {
         console.log('Error:', chrome.runtime.lastError);
         return;
       }
-      if (response && response.success) {
+      if (response) {
         isEnabled = response.isEnabled;
-        updateUI();
+        updateUI(response.isPrejoin);
       }
     });
   });
