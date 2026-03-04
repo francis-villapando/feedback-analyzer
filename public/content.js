@@ -16,7 +16,7 @@ const sampleData = {
     'di ko pa nagegets yung hash table collision resolution',
   ],
   themes: [
-    { label: 'Pace too fast', feedbacks: [0, 1] },
+    { label: 'Pace too fast', feedbacks: [0, 1, 2, 3, 4] },
     { label: 'Needs traversal examples', feedbacks: [1] },
     { label: 'Needs notation review', feedbacks: [2] },
     { label: 'Positive - recursion clear', feedbacks: [3] },
@@ -70,8 +70,9 @@ function injectStyles() {
     .jai-count-badge:hover { background: #EEEEEE; }
     .jai-count-num { font-weight: 600; color: #2E7D32; }
     .jai-count-badge svg { width: 18px; height: 18px; color: #2E7D32; }
-    .jai-popup { position: absolute; top: -10px; right: 100%; margin-right: 8px; width: 200px; background: #FFFFFF; border: 1px solid #E0E0E0; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); padding: 12px; z-index: 10001; opacity: 0; pointer-events: none; transform: translateX(4px); transition: opacity 0.2s ease, transform 0.2s ease; }
-    .jai-popup-trigger:hover .jai-popup { opacity: 1; pointer-events: auto; transform: translateX(0); }
+    .jai-popup { position: absolute; top: -10px; right: 100%; margin-right: 8px; width: 200px; max-height: 200px; background: #FFFFFF; border: 1px solid #E0E0E0; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); padding: 12px; z-index: 10001; opacity: 0; pointer-events: none; transform: translateX(4px); transition: opacity 0.2s ease, transform 0.2s ease; overflow-y: auto; }
+    .jai-popup::-webkit-scrollbar { width: 4px; }
+    .jai-popup::-webkit-scrollbar-thumb { background: #E0E0E0; border-radius: 2px; }
     .jai-popup-title { font-size: 12px; font-weight: 600; color: #2E7D32; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
     .jai-popup-item { font-size: 13px; color: #212121; padding: 4px 0; border-bottom: 1px solid #F5F5F5; line-height: 1.4; }
     .jai-popup-item:last-child { border-bottom: none; }
@@ -82,8 +83,7 @@ function injectStyles() {
     .jai-item-text { flex: 1; }
     .jai-source-dot { position: relative; width: 18px; height: 18px; min-width: 18px; border-radius: 50%; background: rgba(46,125,50,0.12); border: 1px solid rgba(46,125,50,0.3); cursor: default; display: flex; align-items: center; justify-content: center; margin-top: 2px; }
     .jai-source-dot::after { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #2E7D32; }
-    .jai-source-dot .jai-popup { top: 50%; transform: translateY(-50%) translateX(4px); right: 100%; margin-right: 8px; }
-    .jai-source-dot:hover .jai-popup { opacity: 1; pointer-events: auto; transform: translateY(-50%) translateX(0); }
+    .jai-source-dot .jai-popup { top: 50%; transform: translateY(-50%) translateX(4px); right: 100%; margin-right: 8px; max-height: 150px; overflow-y: auto; }
     .jai-issue { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; background: #FFF3E0; border: 1px solid #FFE0B2; border-radius: 8px; margin-bottom: 6px; font-size: 13px; color: #E65100; line-height: 1.45; }
     .jai-issue svg { width: 16px; height: 16px; min-width: 16px; color: #E65100; margin-top: 1px; }
   `;
@@ -103,6 +103,51 @@ function popupList(items) {
     <div class="jai-popup">
       ${items.map(i => `<div class="jai-popup-item">${i}</div>`).join('')}
     </div>`;
+}
+
+// Setup popup hover behavior after sidebar is created
+function setupPopupHover() {
+  // Handle .jai-popup-trigger elements
+  document.querySelectorAll('.jai-popup-trigger').forEach(trigger => {
+    const popup = trigger.querySelector('.jai-popup');
+    if (!popup) return;
+    
+    let hideTimeout;
+    const isSourceDot = trigger.classList.contains('jai-source-dot');
+    
+    // Show popup on mouseenter
+    trigger.addEventListener('mouseenter', () => {
+      clearTimeout(hideTimeout);
+      popup.style.opacity = '1';
+      popup.style.pointerEvents = 'auto';
+      popup.style.transform = isSourceDot ? 'translateY(-50%) translateX(0)' : 'translateX(0)';
+    });
+    
+    // Hide popup on mouseleave with delay
+    trigger.addEventListener('mouseleave', () => {
+      hideTimeout = setTimeout(() => {
+        popup.style.opacity = '0';
+        popup.style.pointerEvents = 'none';
+        popup.style.transform = isSourceDot ? 'translateY(-50%) translateX(4px)' : 'translateX(4px)';
+      }, 100);
+    });
+    
+    // Keep popup visible when hovering the popup itself
+    popup.addEventListener('mouseenter', () => {
+      clearTimeout(hideTimeout);
+      popup.style.opacity = '1';
+      popup.style.pointerEvents = 'auto';
+    });
+    
+    // Hide popup when leaving the popup
+    popup.addEventListener('mouseleave', () => {
+      hideTimeout = setTimeout(() => {
+        popup.style.opacity = '0';
+        popup.style.pointerEvents = 'none';
+        popup.style.transform = isSourceDot ? 'translateY(-50%) translateX(4px)' : 'translateX(4px)';
+      }, 100);
+    });
+  });
 }
 
 // Sidebar UI
@@ -179,6 +224,9 @@ function createSidebar() {
 
   document.body.appendChild(sidebar);
   sidebarVisible = true;
+  
+  // Setup popup hover behavior
+  setupPopupHover();
 
   // Close sidebar
   document.getElementById('jai-close').addEventListener('click', () => {
