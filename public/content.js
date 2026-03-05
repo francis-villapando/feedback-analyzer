@@ -8,6 +8,25 @@ let selectedCourseName = null;
 let selectedTopic = null;
 const sidebarId = 'jitsi-ai-sidebar';
 
+// Consent state for data collection
+let consentPollSent = false;
+const consentState = {
+  pollId: null,
+  question: 'Do you consent to the collection of your name and chat messages in this meeting for AI-powered feedback analysis during this session?',
+  responses: {}, // participantId -> 'yes' | 'no' | null
+  timestamp: null
+};
+
+// Reset consent state when meeting changes
+function resetConsentState() {
+  consentPollSent = false;
+  consentState.pollId = null;
+  consentState.responses = {};
+  consentState.timestamp = null;
+  chrome.storage.local.remove(['consentState']);
+  console.log('[Feedback Analyzer] Consent state reset');
+}
+
 // Placeholders for development
 const sampleData = {
   participants: ['Andrei Artillero', 'Roseanne Borber', 'Francis Villapando', 'Nino Ritualo', 'Lester Gomba'],
@@ -93,6 +112,10 @@ function injectStyles() {
     .jai-source-dot .jai-popup { top: 50%; transform: translateY(-50%) translateX(4px); right: 100%; margin-right: 8px; max-height: 150px; overflow-y: auto; }
     .jai-issue { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; background: #FFF3E0; border: 1px solid #FFE0B2; border-radius: 8px; margin-bottom: 6px; font-size: 13px; color: #E65100; line-height: 1.45; }
     .jai-issue svg { width: 16px; height: 16px; min-width: 16px; color: #E65100; margin-top: 1px; }
+    .jai-consent-btn { width: 100%; padding: 12px 16px; background: #2E7D32; color: #FFFFFF; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.2s ease; margin-bottom: 20px; }
+    .jai-consent-btn:hover { background: #388E3C; }
+    .jai-consent-btn:disabled { background: #CCCCCC; cursor: not-allowed; }
+    .jai-consent-btn.sent { background: #757575; }
   `;
   document.head.appendChild(style);
 }
@@ -188,6 +211,16 @@ function createSidebar() {
     ? `${selectedCourseName} - ${selectedTopic}` 
     : 'Feedback Analyzer';
 
+  // Load consent state from storage and reset for new meeting session
+  chrome.storage.local.get(['consentState'], (result) => {
+    // Reset consent state for new meeting - this is a fresh session
+    resetConsentState();
+    
+    // Update button to initial state (not sent)
+    updateConsentButton(false);
+    console.log('[Feedback Analyzer] Consent state reset for new meeting');
+  });
+
   sidebar.innerHTML = `
     <div class="jai-header">
       <span class="jai-header-title">${courseTopicDisplay}</span>
@@ -206,6 +239,10 @@ function createSidebar() {
           ${popupList(feedbacks)}
         </div>
       </div>
+
+      <button id="sendConsentBtn" class="jai-consent-btn ${consentPollSent ? 'sent' : ''}">
+        ${consentPollSent ? 'Consent Poll Sent' : 'Send Consent Notice'}
+      </button>
 
       <div class="jai-section">
         <div class="jai-section-title">Feedback Themes</div>
@@ -265,6 +302,26 @@ function createSidebar() {
       mainContainer.style.marginRight = '';
     }
   });
+
+  // Send Consent Notice button
+  const consentBtn = document.getElementById('sendConsentBtn');
+  console.log('[Feedback Analyzer] Consent button found:', !!consentBtn, 'consentPollSent:', consentPollSent);
+  
+  if (consentBtn) {
+    consentBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('[Feedback Analyzer] Button clicked, consentPollSent:', consentPollSent);
+      
+      if (!consentPollSent) {
+        createConsentPoll();
+      } else {
+        console.log('[Feedback Analyzer] Poll already sent, skipping');
+      }
+    });
+  } else {
+    console.log('[Feedback Analyzer] ERROR: Consent button not found in DOM');
+  }
 }
 
 function removeSidebar() {
@@ -277,6 +334,179 @@ function removeSidebar() {
     mainContainer.style.marginRight = '';
     mainContainer = null;
   }
+}
+
+// Create consent poll in Jitsi using UI interaction
+function createConsentPoll() {
+  const pollQuestion = 'Do you consent to the collection of your name and chat messages in this meeting for AI-powered feedback analysis during this session?';
+  const pollOptions = ['Yes, I consent', "No, I don't consent"];
+  
+  // Initialize consent state
+  consentPollSent = true;
+  consentState.pollId = 'consent-' + Date.now();
+  consentState.question = pollQuestion;
+  consentState.responses = {};
+  consentState.timestamp = Date.now();
+  
+  console.log('[Feedback Analyzer] Creating consent poll via UI:', { pollQuestion, pollOptions });
+  
+  // Step 1: Click open chat button to reveal chat panel
+  const chatButton = document.querySelector('#new-toolbox > div > div > div > div:nth-child(4)');
+  
+  if (!chatButton) {
+    console.log('[Feedback Analyzer] Could not find chat button');
+    updateConsentButton();
+    chrome.storage.local.set({ consentState: consentState });
+    return;
+  }
+  
+  chatButton.click();
+  console.log('[Feedback Analyzer] Clicked chat button');
+  
+  // Step 2: Wait for chat panel and click polls tab
+  setTimeout(() => {
+    // Try multiple selectors for polls tab
+    let pollsTab = document.querySelector('#polls-tab');
+    
+    if (!pollsTab) {
+      // Try the alternative selector
+      pollsTab = document.querySelector('#new-toolbox > div > div > div > div:nth-child(4) > div > div > div');
+    }
+    
+    if (!pollsTab) {
+      console.log('[Feedback Analyzer] Could not find polls tab');
+      updateConsentButton();
+      chrome.storage.local.set({ consentState: consentState });
+      return;
+    }
+    
+    pollsTab.click();
+    console.log('[Feedback Analyzer] Clicked polls tab');
+    
+    // Step 3: Wait for polls panel and click "Create poll" button
+    setTimeout(() => {
+      const createPollButton = document.querySelector('button[aria-label="Create a poll"]');
+      
+      if (!createPollButton) {
+        console.log('[Feedback Analyzer] Could not find Create a poll button');
+        updateConsentButton();
+        chrome.storage.local.set({ consentState: consentState });
+        return;
+      }
+      
+      createPollButton.click();
+      console.log('[Feedback Analyzer] Clicked Create a poll button');
+      
+      // Step 4: Wait for poll dialog and fill it
+      setTimeout(() => {
+        fillPollDialog(pollQuestion, pollOptions);
+        
+        // Update button state
+        updateConsentButton();
+        chrome.storage.local.set({ consentState: consentState });
+      }, 300); // Wait for dialog
+      
+    }, 500); // Wait for polls panel
+    
+  }, 500); // Wait for chat panel
+}
+
+// Find the polls button in Jitsi's toolbar
+function findPollsButton() {
+  // Use the exact selector provided by user
+  const button = document.querySelector('button[aria-label="Create a poll"]');
+  
+  if (button) {
+    console.log('[Feedback Analyzer] Found polls button');
+    return button;
+  }
+  
+  console.log('[Feedback Analyzer] Could not find polls button');
+  return null;
+}
+
+// Fill the poll dialog with question and options
+function fillPollDialog(question, options) {
+  // Use exact selectors provided by user
+  const questionInput = document.querySelector('#polls-create-input');
+  const option1Input = document.querySelector('#polls-answer-input-0');
+  const option2Input = document.querySelector('#polls-answer-input-1');
+  const submitButton = document.querySelector('button[aria-label="Save"]');
+  
+  console.log('[Feedback Analyzer] Dialog elements:', {
+    questionInput: !!questionInput,
+    option1Input: !!option1Input,
+    option2Input: !!option2Input,
+    submitButton: !!submitButton
+  });
+  
+  let filled = false;
+  
+  if (questionInput) {
+    // Set the question value
+    questionInput.value = question;
+    questionInput.dispatchEvent(new Event('input', { bubbles: true }));
+    questionInput.dispatchEvent(new Event('change', { bubbles: true }));
+    console.log('[Feedback Analyzer] Set poll question');
+    filled = true;
+  }
+  
+  if (option1Input) {
+    option1Input.value = options[0];
+    option1Input.dispatchEvent(new Event('input', { bubbles: true }));
+    console.log('[Feedback Analyzer] Set option 1');
+    filled = true;
+  }
+  
+  if (option2Input) {
+    option2Input.value = options[1];
+    option2Input.dispatchEvent(new Event('input', { bubbles: true }));
+    console.log('[Feedback Analyzer] Set option 2');
+    filled = true;
+  }
+  
+  if (submitButton) {
+    submitButton.click();
+    console.log('[Feedback Analyzer] Clicked Save button');
+  } else {
+    console.log('[Feedback Analyzer] Save button not found');
+  }
+  
+  return filled;
+}
+
+// Update consent button state
+function updateConsentButton(sent = true) {
+  const consentBtn = document.getElementById('sendConsentBtn');
+  if (consentBtn) {
+    if (sent) {
+      consentBtn.textContent = 'Consent Poll Sent';
+      consentBtn.classList.add('sent');
+    } else {
+      consentBtn.textContent = 'Send Consent Notice';
+      consentBtn.classList.remove('sent');
+    }
+  }
+}
+
+// Get Jitsi conference object
+function getJitsiConference() {
+  // Jitsi stores the conference in the global APP object
+  if (window.APP && window.APP.conference) {
+    return window.APP.conference;
+  }
+  return null;
+}
+
+// Check if data collection is allowed for a participant
+function canCollectData(participantId) {
+  // Only collect data if consent poll was sent and participant consented
+  if (!consentPollSent) {
+    return false;
+  }
+  
+  const consent = consentState.responses[participantId];
+  return consent === 'yes';
 }
 
 // Jitsi toolbar button injection
