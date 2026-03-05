@@ -206,24 +206,34 @@ function createSidebar() {
 
   const { participants, feedbacks, themes, recommendations, issues } = sampleData;
   
-  // Build course/topic display string
-  const courseTopicDisplay = selectedCourseName && selectedTopic 
-    ? `${selectedCourseName} - ${selectedTopic}` 
-    : 'Feedback Analyzer';
+  // Fixed title for the sidebar header
+  const headerTitle = 'Feedback Analyzer';
 
-  // Load consent state from storage and reset for new meeting session
-  chrome.storage.local.get(['consentState'], (result) => {
-    // Reset consent state for new meeting - this is a fresh session
-    resetConsentState();
+  // Load consent state from storage - preserve state on sidebar toggle but reset on page refresh
+  // Since in-memory consentPollSent starts as false, we can detect page refresh vs sidebar toggle
+  chrome.storage.local.get(['consentState', 'consentPollSent'], (result) => {
+    const storedConsentState = result.consentState;
+    const storedPollSent = result.consentPollSent;
     
-    // Update button to initial state (not sent)
-    updateConsentButton(false);
-    console.log('[Feedback Analyzer] Consent state reset for new meeting');
+    // Check if we have a valid stored state AND the in-memory consentPollSent was already true
+    // This means we're toggling the sidebar (not a page refresh)
+    if (storedConsentState && storedConsentState.pollId && consentPollSent) {
+      // Sidebar toggle - keep the stored state
+      console.log('[Feedback Analyzer] Sidebar toggle - preserving consent state:', { consentPollSent, pollId: storedConsentState.pollId });
+    } else {
+      // Page refresh or new meeting - reset consent state
+      consentPollSent = false;
+      chrome.storage.local.remove(['consentState', 'consentPollSent']);
+      console.log('[Feedback Analyzer] Page refresh - consent state reset');
+    }
+    
+    // Update button based on consent poll state
+    updateConsentButton(consentPollSent);
   });
 
   sidebar.innerHTML = `
     <div class="jai-header">
-      <span class="jai-header-title">${courseTopicDisplay}</span>
+      <span class="jai-header-title">${headerTitle}</span>
       <button class="jai-close-btn" id="jai-close" title="Close sidebar">✕</button>
     </div>
     <div class="jai-content">
@@ -356,7 +366,7 @@ function createConsentPoll() {
   if (!chatButton) {
     console.log('[Feedback Analyzer] Could not find chat button');
     updateConsentButton();
-    chrome.storage.local.set({ consentState: consentState });
+    chrome.storage.local.set({ consentState: consentState, consentPollSent: true });
     return;
   }
   
@@ -376,7 +386,7 @@ function createConsentPoll() {
     if (!pollsTab) {
       console.log('[Feedback Analyzer] Could not find polls tab');
       updateConsentButton();
-      chrome.storage.local.set({ consentState: consentState });
+      chrome.storage.local.set({ consentState: consentState, consentPollSent: true });
       return;
     }
     
@@ -390,7 +400,7 @@ function createConsentPoll() {
       if (!createPollButton) {
         console.log('[Feedback Analyzer] Could not find Create a poll button');
         updateConsentButton();
-        chrome.storage.local.set({ consentState: consentState });
+        chrome.storage.local.set({ consentState: consentState, consentPollSent: true });
         return;
       }
       
@@ -403,7 +413,7 @@ function createConsentPoll() {
         
         // Update button state
         updateConsentButton();
-        chrome.storage.local.set({ consentState: consentState });
+        chrome.storage.local.set({ consentState: consentState, consentPollSent: true });
       }, 300); // Wait for dialog
       
     }, 500); // Wait for polls panel
