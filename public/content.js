@@ -3,6 +3,9 @@ let sidebarVisible = false;
 let sidebar = null;
 let mainContainer = null;
 let jitsiToggleBtn = null;
+let selectedCourse = null;
+let selectedCourseName = null;
+let selectedTopic = null;
 const sidebarId = 'jitsi-ai-sidebar';
 
 // Placeholders for development
@@ -165,7 +168,7 @@ function setupPopupHover() {
   });
 }
 
-// Sidebar UI
+// Open sidebar
 function createSidebar() {
   if (document.getElementById(sidebarId)) return;
   injectStyles();
@@ -179,10 +182,15 @@ function createSidebar() {
   sidebar.id = sidebarId;
 
   const { participants, feedbacks, themes, recommendations, issues } = sampleData;
+  
+  // Build course/topic display string
+  const courseTopicDisplay = selectedCourseName && selectedTopic 
+    ? `${selectedCourseName} - ${selectedTopic}` 
+    : 'Feedback Analyzer';
 
   sidebar.innerHTML = `
     <div class="jai-header">
-      <span class="jai-header-title">Feedback Analyzer</span>
+      <span class="jai-header-title">${courseTopicDisplay}</span>
       <button class="jai-close-btn" id="jai-close" title="Close sidebar">✕</button>
     </div>
     <div class="jai-content">
@@ -327,12 +335,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === 'toggleMaster') {
     const meetingActive = isMeetingActive();
     
-    console.log('[Feedback Analyzer] toggleMaster called:', { meetingActive, isEnabled });
+    console.log('[Feedback Analyzer] toggleMaster called:', { meetingActive, isEnabled, course: msg.course, topic: msg.topic });
 
     if (!meetingActive) {
       sendResponse({ success: false, isEnabled, isMeetingActive: false });
       return true;
     }
+
+    // Store course/topic selections
+    selectedCourse = msg.course || null;
+    selectedCourseName = msg.courseName || null;
+    selectedTopic = msg.topic || null;
 
     isEnabled = !isEnabled;
     if (isEnabled) {
@@ -348,15 +361,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === 'getState') {
     const meetingActive = isMeetingActive();
     
-    console.log('[Feedback Analyzer] getState called:', { meetingActive, isEnabled });
+    console.log('[Feedback Analyzer] getState called:', { meetingActive, isEnabled, selectedCourse, selectedTopic });
     
-    sendResponse({ isEnabled, isMeetingActive: meetingActive });
-    return true;
-  }
-
-  // Sidebar toggle request from popup
-  if (msg.type === 'toggleSidebar') {
-    msg.enabled ? createSidebar() : removeSidebar();
+    sendResponse({ 
+      isEnabled, 
+      isMeetingActive: meetingActive,
+      selectedCourse: selectedCourse,
+      selectedCourseName: selectedCourseName,
+      selectedTopic: selectedTopic
+    });
     return true;
   }
 

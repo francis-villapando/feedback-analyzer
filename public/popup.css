@@ -176,3 +176,62 @@ body {
   border-radius: 8px;
   border: 1px solid #E0E0E0;
 }
+
+/* Course/Topic Selection */
+.selection-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dropdown-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dropdown-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #212121;
+}
+
+.dropdown-select {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: Roboto, -apple-system, BlinkMacSystemFont, sans-serif;
+  color: #212121;
+  background: #F5F5F5;
+  border: 1px solid #E0E0E0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23757575' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
+
+.dropdown-select:disabled {
+  background-color: #F5F5F5;
+  color: #9E9E9E;
+  cursor: not-allowed;
+  border-color: #E0E0E0;
+}
+
+.dropdown-select.enabled {
+  background-color: #FFFFFF;
+  border-color: #2E7D32;
+}
+
+.dropdown-select.enabled:hover {
+  border-color: #388E3C;
+}
+
+.dropdown-select.enabled:focus {
+  outline: none;
+  border-color: #2E7D32;
+  box-shadow: 0 0 0 2px rgba(46, 125, 50, 0.2);
+}
