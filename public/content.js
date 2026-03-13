@@ -1,3 +1,4 @@
+// Global State
 let isEnabled = false;
 let sidebarVisible = false;
 let sidebar = null;
@@ -8,55 +9,124 @@ let selectedCourseName = null;
 let selectedTopic = null;
 const sidebarId = 'jitsi-ai-sidebar';
 
-// Consent state for data collection
 let consentPollSent = false;
-const consentState = {
-  pollId: null,
-  question: 'Do you consent to the collection of your name and chat messages in this meeting for AI-powered feedback analysis during this session?',
-  responses: {}, // participantId -> 'yes' | 'no' | null
-  timestamp: null
+let pollObserver = null;
+let chatObserver = null;
+
+/**
+ * DatabaseService manages all session data persists in chrome.storage.local.
+ * Designed as an abstraction layer to facilitate future migration to a remote API.
+ */
+const DatabaseService = {
+  _load(callback) {
+    chrome.storage.local.get(['fa_session'], (result) => {
+      callback(result.fa_session || null);
+    });
+  },
+
+  _save(session, callback) {
+    chrome.storage.local.set({ fa_session: session }, callback);
+  },
+
+  /** Initializes a new session with course and topic metadata. */
+  startSession(course, courseName, topic, callback) {
+    const session = {
+      id: 'session-' + Date.now(),
+      course,
+      courseName,
+      topic,
+      startedAt: Date.now(),
+      consentPollSent: false,
+      consentPollId: null,
+      consents: {}, // Map of participant names to 'yes'|'no'
+      feedbacks: [], // Collection of message entries
+    };
+    this._save(session, () => {
+      console.log('[FA:DB] Session started:', session.id);
+      if (callback) callback(session);
+    });
+  },
+
+  /** Retrieves the active session data. */
+  getSession(callback) {
+    this._load(callback);
+  },
+
+  /** Clears session data from local storage. */
+  clearSession(callback) {
+    chrome.storage.local.remove(['fa_session'], () => {
+      console.log('[FA:DB] Session cleared');
+      if (callback) callback();
+    });
+  },
+
+  /** Marks the consent poll as dispatched. */
+  markConsentPollSent(pollId, callback) {
+    this._load((session) => {
+      if (!session) return;
+      session.consentPollSent = true;
+      session.consentPollId = pollId;
+      this._save(session, () => {
+        console.log('[FA:DB] Consent poll marked as sent:', pollId);
+        if (callback) callback(session);
+      });
+    });
+  },
+
+  /** Persists a participant's consent response. */
+  saveConsent(participantName, response, callback) {
+    this._load((session) => {
+      if (!session) return;
+      session.consents[participantName] = response;
+      this._save(session, () => {
+        console.log(`[FA:DB] Consent saved — ${participantName}: ${response}`);
+        if (callback) callback(session);
+      });
+    });
+  },
+
+  /** Checks if a specific participant has granted consent. */
+  hasConsented(participantName, callback) {
+    this._load((session) => {
+      if (!session) { callback(false); return; }
+      callback(session.consents[participantName] === 'yes');
+    });
+  },
+
+  /** Returns an array of all participants who have consented. */
+  getConsentedParticipants(callback) {
+    this._load((session) => {
+      if (!session) { callback([]); return; }
+      const names = Object.entries(session.consents)
+        .filter(([, v]) => v === 'yes')
+        .map(([k]) => k);
+      callback(names);
+    });
+  },
+
+  /** Saves a chat message as feedback for a consented participant. */
+  saveFeedback(sender, text, callback) {
+    this._load((session) => {
+      if (!session) return;
+      const entry = { sender, text, timestamp: Date.now() };
+      session.feedbacks.push(entry);
+      this._save(session, () => {
+        console.log(`[FA:DB] Feedback saved from ${sender}:`, text);
+        if (callback) callback(session);
+      });
+    });
+  },
+
+  /** Retrieves all feedback entries for the current session. */
+  getFeedbacks(callback) {
+    this._load((session) => {
+      if (!session) { callback([]); return; }
+      callback(session.feedbacks || []);
+    });
+  },
 };
 
-// Reset consent state when meeting changes
-function resetConsentState() {
-  consentPollSent = false;
-  consentState.pollId = null;
-  consentState.responses = {};
-  consentState.timestamp = null;
-  chrome.storage.local.remove(['consentState']);
-  console.log('[Feedback Analyzer] Consent state reset');
-}
-
-// Placeholders for development
-const sampleData = {
-  participants: ['Andrei Artillero', 'Roseanne Borber', 'Francis Villapando', 'Nino Ritualo', 'Lester Gomba'],
-  feedbacks: [
-    'ambilis ng explanation sa linked list, kahilo po haha',
-    'parang kulang sa example yung binary tree traversal',
-    'pwede po ba irepeat yung big o notation explanation?',
-    'sobrang ganda ng recursive fibonacci example',
-    'di ko pa nagegets yung hash table collision resolution',
-  ],
-  themes: [
-    { label: 'Pace too fast', feedbacks: [0, 1, 2, 3, 4] },
-    { label: 'Needs traversal examples', feedbacks: [1] },
-    { label: 'Needs notation review', feedbacks: [2] },
-    { label: 'Recursion clear', feedbacks: [3] },
-    { label: 'Hash collision confusion', feedbacks: [4] },
-  ],
-  recommendations: [
-    { label: 'Add 30s pause after linked list insertion visuals', feedbacks: [0] },
-    { label: 'Live demo inorder/preorder/postorder traversal side-by-side', feedbacks: [1] },
-    { label: 'Show O(n) vs O(log n) graph + real array examples', feedbacks: [2] },
-    { label: 'Build recursion visualization with call stack animation', feedbacks: [3] },
-    { label: 'Demo chaining vs open addressing collision with live insert', feedbacks: [4] },
-  ],
-  issues: [
-    'Audio quality too low for transcription in the last 2 minutes.'
-  ],
-};
-
-// Inject CSS styles for sidebar UI
+// UI Components and Styles
 function injectStyles() {
   if (document.getElementById('jitsi-ai-styles')) return;
   const style = document.createElement('style');
@@ -116,57 +186,50 @@ function injectStyles() {
     .jai-consent-btn:hover { background: #388E3C; }
     .jai-consent-btn:disabled { background: #CCCCCC; cursor: not-allowed; }
     .jai-consent-btn.sent { background: #757575; }
+    .jai-placeholder { font-size: 13px; color: #9E9E9E; font-style: italic; padding: 8px 0; }
   `;
   document.head.appendChild(style);
 }
 
-// SVG icons
 const icons = {
   people: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
   feedback: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
   warn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
 };
 
-// Helper function for hover‑popup list
+/** Utility to generate a popup list UI from an array. */
 function popupList(items) {
-  return `
-    <div class="jai-popup">
-      ${items.map(i => `<div class="jai-popup-item">${i}</div>`).join('')}
-    </div>`;
+  if (!items || items.length === 0) {
+    return '<div class="jai-popup"><div class="jai-popup-item jai-placeholder">No data yet</div></div>';
+  }
+  return `<div class="jai-popup">${items.map(i => `<div class="jai-popup-item">${i}</div>`).join('')}</div>`;
 }
 
-// Helper function for theme type (will use proper NLP classification in the future)
+/** Classifies theme types for styling. Future integration point for NLP models. */
 function getThemeType(label) {
   const positiveKeywords = ['positive', 'good', 'great', 'clear', 'excellent', 'helpful'];
   const negativeKeywords = ['confusion', 'confused', 'difficult', 'hard', 'fast', 'slow', 'needs', 'lack', 'missing', 'unclear', ' kulang', ' hirap', 'di ko'];
-  
   const lowerLabel = label.toLowerCase();
-  
-  if (positiveKeywords.some(kw => lowerLabel.includes(kw))) {
-    return 'positive';
-  }
-  if (negativeKeywords.some(kw => lowerLabel.includes(kw))) {
-    return 'negative';
-  }
+  if (positiveKeywords.some(kw => lowerLabel.includes(kw))) return 'positive';
+  if (negativeKeywords.some(kw => lowerLabel.includes(kw))) return 'negative';
   return '';
 }
 
-// Helper function for popup hover behavior
+/** Manages mouse events for sidebar popup triggers. */
 function setupPopupHover() {
   document.querySelectorAll('.jai-popup-trigger').forEach(trigger => {
     const popup = trigger.querySelector('.jai-popup');
     if (!popup) return;
-    
     let hideTimeout;
     const isSourceDot = trigger.classList.contains('jai-source-dot');
-    
+
     trigger.addEventListener('mouseenter', () => {
       clearTimeout(hideTimeout);
       popup.style.opacity = '1';
       popup.style.pointerEvents = 'auto';
       popup.style.transform = isSourceDot ? 'translateY(-50%) translateX(0)' : 'translateX(0)';
     });
-    
+
     trigger.addEventListener('mouseleave', () => {
       hideTimeout = setTimeout(() => {
         popup.style.opacity = '0';
@@ -174,13 +237,13 @@ function setupPopupHover() {
         popup.style.transform = isSourceDot ? 'translateY(-50%) translateX(4px)' : 'translateX(4px)';
       }, 100);
     });
-    
+
     popup.addEventListener('mouseenter', () => {
       clearTimeout(hideTimeout);
       popup.style.opacity = '1';
       popup.style.pointerEvents = 'auto';
     });
-    
+
     popup.addEventListener('mouseleave', () => {
       hideTimeout = setTimeout(() => {
         popup.style.opacity = '0';
@@ -191,378 +254,314 @@ function setupPopupHover() {
   });
 }
 
-// Open sidebar
+/** Updates the participant count badge and its associated popup list. */
+function refreshParticipantsBadge() {
+  DatabaseService.getConsentedParticipants((names) => {
+    const badge = document.getElementById('jai-participants-badge');
+    if (!badge) return;
+    const countEl = badge.querySelector('.jai-count-num');
+    const popupEl = badge.querySelector('.jai-popup');
+    if (countEl) countEl.textContent = names.length;
+    if (popupEl) {
+      popupEl.innerHTML = names.length
+        ? names.map(n => `<div class="jai-popup-item">${n}</div>`).join('')
+        : '<div class="jai-popup-item jai-placeholder">No consented participants yet</div>';
+    }
+  });
+}
+
+/** Updates the feedback count badge and its associated popup list. */
+function refreshFeedbacksBadge() {
+  DatabaseService.getFeedbacks((feedbacks) => {
+    const badge = document.getElementById('jai-feedbacks-badge');
+    if (!badge) return;
+    const countEl = badge.querySelector('.jai-count-num');
+    const popupEl = badge.querySelector('.jai-popup');
+    if (countEl) countEl.textContent = feedbacks.length;
+    if (popupEl) {
+      popupEl.innerHTML = feedbacks.length
+        ? feedbacks.map(f => `<div class="jai-popup-item">${f.text}</div>`).join('')
+        : '<div class="jai-popup-item jai-placeholder">No feedbacks collected yet</div>';
+    }
+  });
+}
+
+/** Creates and displays the analyzer sidebar in the Jitsi interface. */
 function createSidebar() {
   if (document.getElementById(sidebarId)) return;
   injectStyles();
 
   mainContainer = document.querySelector('[role="main"]');
-  if (mainContainer) {
-    mainContainer.style.setProperty('margin-right', '350px', 'important');
-  }
+  if (mainContainer) mainContainer.style.setProperty('margin-right', '350px', 'important');
 
   sidebar = document.createElement('div');
   sidebar.id = sidebarId;
 
-  const { participants, feedbacks, themes, recommendations, issues } = sampleData;
-  
-  // Fixed title for the sidebar header
-  const headerTitle = 'Feedback Analyzer';
-
-  // Load consent state from storage - preserve state on sidebar toggle but reset on page refresh
-  // Since in-memory consentPollSent starts as false, we can detect page refresh vs sidebar toggle
-  chrome.storage.local.get(['consentState', 'consentPollSent'], (result) => {
-    const storedConsentState = result.consentState;
-    const storedPollSent = result.consentPollSent;
-    
-    // Check if we have a valid stored state AND the in-memory consentPollSent was already true
-    // This means we're toggling the sidebar (not a page refresh)
-    if (storedConsentState && storedConsentState.pollId && consentPollSent) {
-      // Sidebar toggle - keep the stored state
-      console.log('[Feedback Analyzer] Sidebar toggle - preserving consent state:', { consentPollSent, pollId: storedConsentState.pollId });
-    } else {
-      // Page refresh or new meeting - reset consent state
-      consentPollSent = false;
-      chrome.storage.local.remove(['consentState', 'consentPollSent']);
-      console.log('[Feedback Analyzer] Page refresh - consent state reset');
-    }
-    
-    // Update button based on consent poll state
-    updateConsentButton(consentPollSent);
-  });
+  const themesPlaceholder = `<div class="jai-placeholder">Themes will appear here once AI analysis is connected.</div>`;
+  const recommendationsPlaceholder = `<div class="jai-placeholder">Recommendations will appear here once AI analysis is connected.</div>`;
 
   sidebar.innerHTML = `
     <div class="jai-header">
-      <span class="jai-header-title">${headerTitle}</span>
+      <span class="jai-header-title">Feedback Analyzer</span>
       <button class="jai-close-btn" id="jai-close" title="Close sidebar">✕</button>
     </div>
     <div class="jai-content">
       <div class="jai-counts">
-        <div class="jai-count-badge jai-popup-trigger">
+        <div id="jai-participants-badge" class="jai-count-badge jai-popup-trigger">
           ${icons.people}
-          <span class="jai-count-num">${participants.length}</span> Participants
-          ${popupList(participants)}
+          <span class="jai-count-num">0</span> Participants
+          <div class="jai-popup"><div class="jai-popup-item jai-placeholder">No consented participants yet</div></div>
         </div>
-        <div class="jai-count-badge jai-popup-trigger">
+        <div id="jai-feedbacks-badge" class="jai-count-badge jai-popup-trigger">
           ${icons.feedback}
-          <span class="jai-count-num">${feedbacks.length}</span> Feedbacks
-          ${popupList(feedbacks)}
+          <span class="jai-count-num">0</span> Feedbacks
+          <div class="jai-popup"><div class="jai-popup-item jai-placeholder">No feedbacks collected yet</div></div>
         </div>
       </div>
-
       <button id="sendConsentBtn" class="jai-consent-btn ${consentPollSent ? 'sent' : ''}">
         ${consentPollSent ? 'Consent Poll Sent' : 'Send Consent Notice'}
       </button>
-
       <div class="jai-section">
         <div class="jai-section-title">Feedback Themes</div>
-        ${themes.map(t => {
-          const themeType = getThemeType(t.label);
-          const dotClass = themeType ? `jai-source-dot ${themeType}` : 'jai-source-dot';
-          return `
-          <div class="jai-item">
-            <span class="jai-item-text">${t.label}</span>
-            <div class="${dotClass} jai-popup-trigger">
-              ${popupList(t.feedbacks.map(i => feedbacks[i]))}
-            </div>
-          </div>`;
-        }).join('')}
+        ${themesPlaceholder}
       </div>
-
       <div class="jai-section">
         <div class="jai-section-title">Teaching Strategy Recommendations</div>
-        ${recommendations.map(r => `
-          <div class="jai-item">
-            <span class="jai-item-text">${r.label}</span>
-            <div class="jai-source-dot jai-popup-trigger">
-              ${popupList(r.feedbacks.map(i => feedbacks[i]))}
-            </div>
-          </div>
-        `).join('')}
+        ${recommendationsPlaceholder}
       </div>
-
-      ${issues.length ? `
-        <div class="jai-section">
-          <div class="jai-section-title">Issues</div>
-          ${issues.map(msg => `
-            <div class="jai-issue">
-              ${icons.warn}
-              <span>${msg}</span>
-            </div>
-          `).join('')}
-        </div>
-      ` : ''}
     </div>
   `;
 
   document.body.appendChild(sidebar);
   sidebarVisible = true;
-  
-  // Setup popup hover behavior
+  refreshParticipantsBadge();
+  refreshFeedbacksBadge();
   setupPopupHover();
 
-  // Close sidebar
+  DatabaseService.getSession((session) => {
+    if (session && session.consentPollSent) {
+      consentPollSent = true;
+      updateConsentButton(true);
+    } else {
+      updateConsentButton(false);
+    }
+  });
+
   document.getElementById('jai-close').addEventListener('click', () => {
     sidebar.style.animation = 'none';
     sidebar.style.transform = 'translateX(100%)';
     sidebar.style.transition = 'transform 0.2s ease';
     setTimeout(() => sidebar.remove(), 200);
     sidebarVisible = false;
-    if (mainContainer) {
-      mainContainer.style.marginRight = '';
-    }
+    if (mainContainer) mainContainer.style.marginRight = '';
   });
 
-  // Send Consent Notice button
   const consentBtn = document.getElementById('sendConsentBtn');
-  console.log('[Feedback Analyzer] Consent button found:', !!consentBtn, 'consentPollSent:', consentPollSent);
-  
   if (consentBtn) {
     consentBtn.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      console.log('[Feedback Analyzer] Button clicked, consentPollSent:', consentPollSent);
-      
-      if (!consentPollSent) {
-        createConsentPoll();
-      } else {
-        console.log('[Feedback Analyzer] Poll already sent, skipping');
-      }
+      if (!consentPollSent) createConsentPoll();
     });
-  } else {
-    console.log('[Feedback Analyzer] ERROR: Consent button not found in DOM');
   }
 }
 
 function removeSidebar() {
   const el = document.getElementById(sidebarId);
-  if (el) {
-    el.remove();
-    sidebarVisible = false;
-  }
-  if (mainContainer) {
-    mainContainer.style.marginRight = '';
-    mainContainer = null;
-  }
+  if (el) { el.remove(); sidebarVisible = false; }
+  if (mainContainer) { mainContainer.style.marginRight = ''; mainContainer = null; }
 }
 
-// Create consent poll in Jitsi using UI interaction
+/** Automates the creation of a consent poll using Jitsi's UI. */
 function createConsentPoll() {
   const pollQuestion = 'Do you consent to the collection of your name and chat messages in this meeting for AI-powered feedback analysis during this session?';
   const pollOptions = ['Yes, I consent', "No, I don't consent"];
-  
-  // Initialize consent state
-  consentPollSent = true;
-  consentState.pollId = 'consent-' + Date.now();
-  consentState.question = pollQuestion;
-  consentState.responses = {};
-  consentState.timestamp = Date.now();
-  
-  console.log('[Feedback Analyzer] Creating consent poll via UI:', { pollQuestion, pollOptions });
-  
-  // Step 1: Click open chat button to reveal chat panel
+  const pollId = 'consent-' + Date.now();
+
   const chatButton = document.querySelector('#new-toolbox > div > div > div > div:nth-child(4)');
-  
-  if (!chatButton) {
-    console.log('[Feedback Analyzer] Could not find chat button');
-    updateConsentButton();
-    chrome.storage.local.set({ consentState: consentState, consentPollSent: true });
-    return;
-  }
-  
+  if (!chatButton) { _finishConsentPollSetup(pollId); return; }
   chatButton.click();
-  console.log('[Feedback Analyzer] Clicked chat button');
-  
-  // Step 2: Wait for chat panel and click polls tab
+
   setTimeout(() => {
-    // Try multiple selectors for polls tab
-    let pollsTab = document.querySelector('#polls-tab');
-    
-    if (!pollsTab) {
-      // Try the alternative selector
-      pollsTab = document.querySelector('#new-toolbox > div > div > div > div:nth-child(4) > div > div > div');
-    }
-    
-    if (!pollsTab) {
-      console.log('[Feedback Analyzer] Could not find polls tab');
-      updateConsentButton();
-      chrome.storage.local.set({ consentState: consentState, consentPollSent: true });
-      return;
-    }
-    
+    let pollsTab = document.querySelector('#polls-tab') || document.querySelector('#new-toolbox > div > div > div > div:nth-child(4) > div > div > div');
+    if (!pollsTab) { _finishConsentPollSetup(pollId); return; }
     pollsTab.click();
-    console.log('[Feedback Analyzer] Clicked polls tab');
-    
-    // Step 3: Wait for polls panel and click "Create poll" button
+
     setTimeout(() => {
       const createPollButton = document.querySelector('button[aria-label="Create a poll"]');
-      
-      if (!createPollButton) {
-        console.log('[Feedback Analyzer] Could not find Create a poll button');
-        updateConsentButton();
-        chrome.storage.local.set({ consentState: consentState, consentPollSent: true });
-        return;
-      }
-      
+      if (!createPollButton) { _finishConsentPollSetup(pollId); return; }
       createPollButton.click();
-      console.log('[Feedback Analyzer] Clicked Create a poll button');
-      
-      // Step 4: Wait for poll dialog and fill it
+
       setTimeout(() => {
         fillPollDialog(pollQuestion, pollOptions);
-        
-        // Update button state
-        updateConsentButton();
-        chrome.storage.local.set({ consentState: consentState, consentPollSent: true });
-      }, 300); // Wait for dialog
-      
-    }, 500); // Wait for polls panel
-    
-  }, 500); // Wait for chat panel
+        setTimeout(() => {
+          const sendButton = document.querySelector('button[aria-label="Send poll"]');
+          if (sendButton) {
+            sendButton.click();
+            console.log('[FA] Consent poll broadcasted');
+          }
+          setTimeout(() => {
+            const skipButton = document.querySelector('button[aria-label="Skip"]') ||
+              Array.from(document.querySelectorAll('button')).find(btn => btn.textContent.trim().toLowerCase() === 'skip');
+            if (skipButton) skipButton.click();
+            _finishConsentPollSetup(pollId);
+          }, 1500);
+        }, 500);
+      }, 300);
+    }, 500);
+  }, 500);
 }
 
-// Find the polls button in Jitsi's toolbar
-function findPollsButton() {
-  // Use the exact selector provided by user
-  const button = document.querySelector('button[aria-label="Create a poll"]');
-  
-  if (button) {
-    console.log('[Feedback Analyzer] Found polls button');
-    return button;
-  }
-  
-  console.log('[Feedback Analyzer] Could not find polls button');
-  return null;
+function _finishConsentPollSetup(pollId) {
+  consentPollSent = true;
+  DatabaseService.markConsentPollSent(pollId, () => {
+    updateConsentButton(true);
+    startPollObserver();
+    startChatObserver();
+  });
 }
 
-// Fill the poll dialog with question and options
 function fillPollDialog(question, options) {
-  // Use exact selectors provided by user
   const questionInput = document.querySelector('#polls-create-input');
   const option1Input = document.querySelector('#polls-answer-input-0');
   const option2Input = document.querySelector('#polls-answer-input-1');
   const submitButton = document.querySelector('button[aria-label="Save"]');
-  
-  console.log('[Feedback Analyzer] Dialog elements:', {
-    questionInput: !!questionInput,
-    option1Input: !!option1Input,
-    option2Input: !!option2Input,
-    submitButton: !!submitButton
-  });
-  
-  let filled = false;
-  
+
   if (questionInput) {
-    // Set the question value
     questionInput.value = question;
     questionInput.dispatchEvent(new Event('input', { bubbles: true }));
     questionInput.dispatchEvent(new Event('change', { bubbles: true }));
-    console.log('[Feedback Analyzer] Set poll question');
-    filled = true;
   }
-  
   if (option1Input) {
     option1Input.value = options[0];
     option1Input.dispatchEvent(new Event('input', { bubbles: true }));
-    console.log('[Feedback Analyzer] Set option 1');
-    filled = true;
   }
-  
   if (option2Input) {
     option2Input.value = options[1];
     option2Input.dispatchEvent(new Event('input', { bubbles: true }));
-    console.log('[Feedback Analyzer] Set option 2');
-    filled = true;
   }
-  
-  if (submitButton) {
-    submitButton.click();
-    console.log('[Feedback Analyzer] Clicked Save button');
-  } else {
-    console.log('[Feedback Analyzer] Save button not found');
-  }
-  
-  return filled;
+  if (submitButton) submitButton.click();
 }
 
-// Update consent button state
 function updateConsentButton(sent = true) {
   const consentBtn = document.getElementById('sendConsentBtn');
   if (consentBtn) {
-    if (sent) {
-      consentBtn.textContent = 'Consent Poll Sent';
-      consentBtn.classList.add('sent');
-    } else {
-      consentBtn.textContent = 'Send Consent Notice';
-      consentBtn.classList.remove('sent');
+    if (sent) { consentBtn.textContent = 'Consent Poll Sent'; consentBtn.classList.add('sent'); }
+    else { consentBtn.textContent = 'Send Consent Notice'; consentBtn.classList.remove('sent'); }
+  }
+}
+
+// Observers for Poll Responses and Chat Messages
+const POLL_SELECTORS = {
+  resultsContainer: '[data-testid="polls-results"], .poll-results, #polls-results',
+  answerRow: '[data-testid^="polls-answer"], .poll-answer-row',
+  answerLabel: '[data-testid="polls-answer-label"], .poll-answer-label, span',
+  voterItem: '[data-testid="polls-voter"], .polls-voter, .vote-item, li',
+};
+
+function startPollObserver() {
+  if (pollObserver) return;
+  const observeTarget = document.querySelector(POLL_SELECTORS.resultsContainer) || document.querySelector('#new-toolbox') || document.body;
+  pollObserver = new MutationObserver(() => _processPollResults());
+  pollObserver.observe(observeTarget, { childList: true, subtree: true });
+  _processPollResults();
+}
+
+function stopPollObserver() {
+  if (pollObserver) { pollObserver.disconnect(); pollObserver = null; }
+}
+
+function _processPollResults() {
+  const answerRows = document.querySelectorAll(POLL_SELECTORS.answerRow);
+  if (answerRows.length === 0) return;
+  answerRows.forEach((row) => {
+    const labelEl = row.querySelector(POLL_SELECTORS.answerLabel);
+    const labelText = labelEl ? labelEl.textContent.trim().toLowerCase() : '';
+    let response = null;
+    if (labelText.includes('yes') || labelText.includes('consent')) response = 'yes';
+    else if (labelText.includes('no') || labelText.includes("don't")) response = 'no';
+    if (!response) return;
+    row.querySelectorAll(POLL_SELECTORS.voterItem).forEach((voterEl) => {
+      const name = voterEl.textContent.trim();
+      if (name) DatabaseService.saveConsent(name, response, () => refreshParticipantsBadge());
+    });
+  });
+}
+
+const CHAT_SELECTORS = {
+  conversationContainer: '.chat-conversation-container, [data-testid="chat-conversation"]',
+  messageItem: '.chatmessage-wrapper, [data-testid="chat-message"], .message-group',
+  senderName: '.display-name, [data-testid="chat-message-author"], .participant-name',
+  messageBody: '.usermessage, [data-testid="chat-message-body"], .chat-text',
+};
+
+const _processedMessages = new WeakSet();
+
+function startChatObserver() {
+  if (chatObserver) return;
+  const observeTarget = document.querySelector(CHAT_SELECTORS.conversationContainer) || document.querySelector('#new-toolbox') || document.body;
+  chatObserver = new MutationObserver(() => _processChatMessages());
+  chatObserver.observe(observeTarget, { childList: true, subtree: true });
+  _processChatMessages();
+}
+
+function stopChatObserver() {
+  if (chatObserver) { chatObserver.disconnect(); chatObserver = null; }
+}
+
+function _processChatMessages() {
+  document.querySelectorAll(CHAT_SELECTORS.messageItem).forEach((msgEl) => {
+    if (_processedMessages.has(msgEl)) return;
+    _processedMessages.add(msgEl);
+    const senderEl = msgEl.querySelector(CHAT_SELECTORS.senderName);
+    const bodyEl = msgEl.querySelector(CHAT_SELECTORS.messageBody);
+    if (!senderEl || !bodyEl) return;
+    const senderName = senderEl.textContent.trim();
+    const messageText = bodyEl.textContent.trim();
+    if (senderName && messageText) {
+      DatabaseService.hasConsented(senderName, (consented) => {
+        if (consented) DatabaseService.saveFeedback(senderName, messageText, () => refreshFeedbacksBadge());
+      });
     }
-  }
+  });
 }
 
-// Get Jitsi conference object
-function getJitsiConference() {
-  // Jitsi stores the conference in the global APP object
-  if (window.APP && window.APP.conference) {
-    return window.APP.conference;
-  }
-  return null;
-}
-
-// Check if data collection is allowed for a participant
-function canCollectData(participantId) {
-  // Only collect data if consent poll was sent and participant consented
-  if (!consentPollSent) {
-    return false;
-  }
-  
-  const consent = consentState.responses[participantId];
-  return consent === 'yes';
-}
-
-// Jitsi toolbar button injection
+// Toolbar and Lifecycle
 function injectJitsiToggleButton() {
   const toolbar = document.querySelector('.toolbox-content-items');
   if (!toolbar || jitsiToggleBtn) return;
-
   jitsiToggleBtn = document.createElement('div');
   jitsiToggleBtn.className = 'toolbox-button';
   jitsiToggleBtn.setAttribute('role', 'button');
   jitsiToggleBtn.setAttribute('tabindex', '0');
   jitsiToggleBtn.setAttribute('aria-disabled', 'false');
   jitsiToggleBtn.style.cursor = 'pointer';
-
   jitsiToggleBtn.innerHTML = `
     <div style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: inherit; overflow: hidden;">
       <img src="${chrome.runtime.getURL('icon32.png')}" style="width: 100%; height: 100%; object-fit: cover; display: block; border-radius: inherit;" aria-hidden="true" />
     </div>
   `;
-
   jitsiToggleBtn.addEventListener('click', toggleSidebar);
-
   jitsiToggleBtn.addEventListener('mouseenter', () => { jitsiToggleBtn.style.background = 'rgba(0,0,0,0.1)'; });
   jitsiToggleBtn.addEventListener('mouseleave', () => { jitsiToggleBtn.style.background = ''; });
-
   toolbar.appendChild(jitsiToggleBtn);
-  console.log('Feedback Analyzer button injected');
 }
 
 function removeJitsiToggleButton() {
-  if (jitsiToggleBtn) {
-    jitsiToggleBtn.remove();
-    jitsiToggleBtn = null;
-  }
+  if (jitsiToggleBtn) { jitsiToggleBtn.remove(); jitsiToggleBtn = null; }
   removeSidebar();
 }
 
 function toggleSidebar() {
-  if (sidebarVisible) {
-    removeSidebar();
-  } else {
-    createSidebar();
-  }
+  if (sidebarVisible) removeSidebar();
+  else createSidebar();
 }
 
-// Helper function to check if in Jitsi meet
+function stopObservers() {
+  stopPollObserver();
+  stopChatObserver();
+}
+
 function isMeetingActive() {
   const hasToolbox = !!document.querySelector('.toolbox-content-items');
   const hasPrejoin = !!document.querySelector('[data-testid="prejoin.joinMeeting"]');
@@ -570,48 +569,22 @@ function isMeetingActive() {
   return hasToolbox && !hasPrejoin && !hasLogin;
 }
 
-// Message handler from popup.js
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === 'toggleMaster') {
     const meetingActive = isMeetingActive();
-    
-    console.log('[Feedback Analyzer] toggleMaster called:', { meetingActive, isEnabled, course: msg.course, topic: msg.topic });
-
-    if (!meetingActive) {
-      sendResponse({ success: false, isEnabled, isMeetingActive: false });
-      return true;
-    }
-
-    // Store course/topic selections
+    if (!meetingActive) { sendResponse({ success: false, isEnabled, isMeetingActive: false }); return true; }
     selectedCourse = msg.course || null;
     selectedCourseName = msg.courseName || null;
     selectedTopic = msg.topic || null;
-
     isEnabled = !isEnabled;
-    if (isEnabled) {
-      injectJitsiToggleButton();
-    } else {
-      removeJitsiToggleButton();
-    }
+    if (isEnabled) DatabaseService.startSession(selectedCourse, selectedCourseName, selectedTopic, () => injectJitsiToggleButton());
+    else { stopObservers(); removeJitsiToggleButton(); consentPollSent = false; DatabaseService.clearSession(); }
     sendResponse({ success: true, isEnabled, isMeetingActive: true });
     return true;
   }
-
-  // Popup UI asks for current state
   if (msg.action === 'getState') {
-    const meetingActive = isMeetingActive();
-    
-    console.log('[Feedback Analyzer] getState called:', { meetingActive, isEnabled, selectedCourse, selectedTopic });
-    
-    sendResponse({ 
-      isEnabled, 
-      isMeetingActive: meetingActive,
-      selectedCourse: selectedCourse,
-      selectedCourseName: selectedCourseName,
-      selectedTopic: selectedTopic
-    });
+    sendResponse({ isEnabled, isMeetingActive: isMeetingActive(), selectedCourse, selectedCourseName, selectedTopic });
     return true;
   }
-
   return true;
 });
