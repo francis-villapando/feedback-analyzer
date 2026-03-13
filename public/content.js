@@ -543,11 +543,12 @@ function _processPollResults() {
   });
 }
 
+// Chat Selectors based on provided Jitsi DOM
 const CHAT_SELECTORS = {
-  conversationContainer: '.chat-conversation-container, [data-testid="chat-conversation"]',
-  messageItem: '.chatmessage-wrapper, [data-testid="chat-message"], .message-group',
-  senderName: '.display-name, [data-testid="chat-message-author"], .participant-name',
-  messageBody: '.usermessage, [data-testid="chat-message-body"], .chat-text',
+  conversationContainer: '#chatconversation',
+  messageGroup: '.chat-message-group, .css-ks74nz-messageGroup', // The overall group for consecutive messages
+  senderName: '.css-vpkttz-displayName',           // The sender's name (only appears in the first message of a group)
+  messageText: '.css-sufr58-userMessage > p',      // Individual message nodes
 };
 
 const _processedMessages = new WeakSet();
@@ -555,6 +556,7 @@ const _processedMessages = new WeakSet();
 function startChatObserver() {
   if (chatObserver) return;
   const observeTarget = document.querySelector(CHAT_SELECTORS.conversationContainer) || document.querySelector('#new-toolbox') || document.body;
+  // Use childList and subtree to catch new paragraphs added inside existing wrappers
   chatObserver = new MutationObserver(() => _processChatMessages());
   chatObserver.observe(observeTarget, { childList: true, subtree: true });
   _processChatMessages();
@@ -565,14 +567,30 @@ function stopChatObserver() {
 }
 
 function _processChatMessages() {
-  document.querySelectorAll(CHAT_SELECTORS.messageItem).forEach((msgEl) => {
-    if (_processedMessages.has(msgEl)) return;
-    _processedMessages.add(msgEl);
-    const senderEl = msgEl.querySelector(CHAT_SELECTORS.senderName);
-    const bodyEl = msgEl.querySelector(CHAT_SELECTORS.messageBody);
-    if (!senderEl || !bodyEl) return;
+  // Rather than iterating over wrappers (which group consecutive messages from one user),
+  // we iterate over the actual message text paragraphs so we don't miss grouped messages.
+  document.querySelectorAll(CHAT_SELECTORS.messageText).forEach((pEl) => {
+    if (_processedMessages.has(pEl)) return;
+    _processedMessages.add(pEl);
+
+    // Find the sender name from the overall message group
+    // Jitsi omits the display name on consecutive messages, but the parent group always has it in its first message
+    const msgGroup = pEl.closest(CHAT_SELECTORS.messageGroup);
+    if (!msgGroup) return;
+
+    const senderEl = msgGroup.querySelector(CHAT_SELECTORS.senderName);
+    if (!senderEl) return;
+
     const senderName = senderEl.textContent.trim();
-    const messageText = bodyEl.textContent.trim();
+    
+    // Jitsi includes a <span class="sr-only">Sender says:</span> inside the paragraph.
+    // We clone the paragraph, remove the sr-only span, and then extract the text.
+    const bodyClone = pEl.cloneNode(true);
+    const srSpan = bodyClone.querySelector('.sr-only');
+    if (srSpan) srSpan.remove();
+    
+    const messageText = bodyClone.textContent.trim();
+
     if (senderName && messageText) {
       DatabaseService.hasConsented(senderName, (consented) => {
         if (consented) DatabaseService.saveFeedback(senderName, messageText, () => refreshFeedbacksBadge());
