@@ -1,4 +1,3 @@
-// Global State
 let isEnabled = false;
 let sidebarVisible = false;
 let sidebar = null;
@@ -12,11 +11,9 @@ const sidebarId = 'jitsi-ai-sidebar';
 let consentPollSent = false;
 let pollObserver = null;
 let chatObserver = null;
+let participantVotes = {};
+let lastProcessedPollState = null;
 
-/**
- * DatabaseService manages all session data persists in chrome.storage.local.
- * Designed as an abstraction layer to facilitate future migration to a remote API.
- */
 const DatabaseService = {
   _load(callback) {
     chrome.storage.local.get(['fa_session'], (result) => {
@@ -38,8 +35,8 @@ const DatabaseService = {
       startedAt: Date.now(),
       consentPollSent: false,
       consentPollId: null,
-      consents: {}, // Map of participant names to 'yes'|'no'
-      feedbacks: [], // Collection of message entries
+      consents: {},
+      feedbacks: [],
     };
     this._save(session, () => {
       console.log('[FA:DB] Session started:', session.id);
@@ -55,6 +52,8 @@ const DatabaseService = {
   /** Clears session data from local storage. */
   clearSession(callback) {
     chrome.storage.local.remove(['fa_session'], () => {
+      participantVotes = {};
+      lastProcessedPollState = null;
       console.log('[FA:DB] Session cleared');
       if (callback) callback();
     });
@@ -73,23 +72,47 @@ const DatabaseService = {
     });
   },
 
-  /** Persists a participant's consent response. */
+  /** Persists a participant's consent response with validation. */
   saveConsent(participantName, response, callback) {
     this._load((session) => {
       if (!session) return;
       
-      // Prevent saving and broadcasting if the vote hasn't actually changed.
-      // This prevents infinite MutationObserver loops while allowing users to change their votes.
-      if (session.consents[participantName] === response) {
-        return; 
+      const previousVote = participantVotes[participantName];
+      
+      if (previousVote === response) {
+        console.log(`[FA:DB] Participant ${participantName} already voted "${response}", ignoring duplicate`);
+        return;
       }
-
-      session.consents[participantName] = response;
-      this._save(session, () => {
-        console.log(`[FA:DB] Consent saved/updated — ${participantName}: ${response}`);
-        if (callback) callback(session);
-      });
+      
+      participantVotes[participantName] = response;
+      
+      if (response === 'yes' && previousVote !== 'yes') {
+        session.consents[participantName] = 'yes';
+        this._save(session, () => {
+          console.log(`[FA:DB] Consent recorded for ${participantName}`);
+          if (callback) callback(session);
+        });
+      } else if (response === 'yes' && previousVote === 'yes') {
+        console.log(`[FA:DB] Participant ${participantName} already has consent recorded`);
+      } else if (response === 'no' || response === 'multiple') {
+        if (session.consents[participantName]) {
+          delete session.consents[participantName];
+          this._save(session, () => {
+            console.log(`[FA:DB] Consent removed for ${participantName} (voted "${response}")`);
+            if (callback) callback(session);
+          });
+        } else {
+          console.log(`[FA:DB] Participant ${participantName} voted "${response}", not saved as consent`);
+        }
+      }
     });
+  },
+
+  /** Clears vote tracking state. */
+  clearVoteTracking() {
+    participantVotes = {};
+    lastProcessedPollState = null;
+    console.log('[FA:DB] Vote tracking cleared');
   },
 
   /** Checks if a specific participant has granted consent. */
@@ -458,21 +481,15 @@ function updateConsentButton(sent = true) {
   }
 }
 
-// Selectors confirmed from Jitsi's poll RESULTS card (the view after Skip is clicked).
-// This is a completely different DOM structure from the voting card.
 const POLL_SELECTORS = {
   pollContainer: 'div.css-8h8cwl-container',       // Outer poll card (stays in DOM after Skip)
   resultList:    'ul.css-1y07j3x-resultList',       // Results list container
   answerRow:     'ul.css-1y07j3x-resultList > li',  // Each answer result row (plain li)
   answerLabel:   'div.css-sf4n65-answerName',        // Answer text label inside each row
-  // Voter names appear inside each li when someone votes.
-  // The exact element is still unknown — diagnostic log in _processPollResults will reveal it.
 };
 
 function startPollObserver() {
   if (pollObserver) return;
-  // Always watch document.body — the poll card is dismissed after Skip is clicked,
-  // so watching it directly would cause the observer to miss vote results entirely.
   pollObserver = new MutationObserver(() => _processPollResults());
   pollObserver.observe(document.body, { childList: true, subtree: true });
   console.log('[FA] Poll observer started on document.body');
@@ -484,10 +501,8 @@ function stopPollObserver() {
 }
 
 function _processPollResults() {
+  const currentPollState = {};
   const pollCard = document.querySelector(POLL_SELECTORS.pollContainer);
-
-  // If there's a "Show details" button, we need to click it to reveal the voter names.
-  // We'll only click it once to avoid an infinite loop of observer triggers.
   if (pollCard && !pollCard.dataset.detailsClicked) {
     const showDetailsBtn = Array.from(pollCard.querySelectorAll('button')).find(
       btn => btn.textContent.trim().toLowerCase() === 'show details'
@@ -496,7 +511,7 @@ function _processPollResults() {
       console.log('[FA:POLL] Found "Show details" button, clicking to reveal names hidden by Jitsi...');
       pollCard.dataset.detailsClicked = 'true';
       showDetailsBtn.click();
-      return; // The click will trigger another mutation, which will process the updated DOM.
+      return;
     }
   }
 
@@ -506,6 +521,7 @@ function _processPollResults() {
     return;
   }
 
+  // Build current poll state from DOM
   answerRows.forEach((row) => {
     const labelEl = row.querySelector(POLL_SELECTORS.answerLabel);
     const labelText = labelEl ? labelEl.textContent.trim().toLowerCase() : '';
@@ -515,9 +531,6 @@ function _processPollResults() {
     else if (labelText.startsWith('no')) response = 'no';
     if (!response) return;
 
-    // Diagnostic: log each result row's innerHTML so we can see where voter names appear.
-    // console.log(`[FA:POLL] Result row (${response}), innerHTML:`, row.innerHTML);
-
     // Collect voter names from any div/span/li children that aren't the answer label or count.
     const candidateVoters = Array.from(row.querySelectorAll('div, span, li'))
       .filter(el => {
@@ -525,7 +538,7 @@ function _processPollResults() {
         return text.length > 0 && text.length < 60
           && !text.toLowerCase().includes('consent')
           && !text.toLowerCase().includes("don't")
-          && !text.match(/^\d+\s*\([\d.]+%\)$/); // Exclude "0 (0%)" vote count strings
+          && !text.match(/^\d+\s*\([\d.]+%\)$/);
       });
 
     if (candidateVoters.length === 0) {
@@ -536,13 +549,34 @@ function _processPollResults() {
     candidateVoters.forEach((voterEl) => {
       const name = voterEl.textContent.trim();
       if (!name) return;
-
-      DatabaseService.saveConsent(name, response, () => refreshParticipantsBadge());
+      if (currentPollState[name]) {
+        currentPollState[name] = 'multiple';
+      } else {
+        currentPollState[name] = response;
+      }
     });
+  });
+
+  // Check if poll state changed since last processing
+  const stateChanged = JSON.stringify(currentPollState) !== JSON.stringify(lastProcessedPollState);
+  if (!stateChanged && lastProcessedPollState) {
+    return;
+  }
+  lastProcessedPollState = currentPollState;
+
+  // Process each participant's current vote state
+  Object.entries(currentPollState).forEach(([name, vote]) => {
+    if (vote === 'multiple') {
+      console.log(`[FA:POLL] Participant ${name} voted multiple options, NOT counting as consent`);
+      DatabaseService.saveConsent(name, 'multiple', () => refreshParticipantsBadge());
+    } else if (vote === 'yes') {
+      DatabaseService.saveConsent(name, 'yes', () => refreshParticipantsBadge());
+    } else if (vote === 'no') {
+      DatabaseService.saveConsent(name, 'no', () => refreshParticipantsBadge());
+    }
   });
 }
 
-// Chat Selectors based on provided Jitsi DOM
 const CHAT_SELECTORS = {
   conversationContainer: '#chatconversation',
   messageGroup: '.chat-message-group, .css-ks74nz-messageGroup', // The overall group for consecutive messages
@@ -555,7 +589,6 @@ const _processedMessages = new WeakSet();
 function startChatObserver() {
   if (chatObserver) return;
   const observeTarget = document.querySelector(CHAT_SELECTORS.conversationContainer) || document.querySelector('#new-toolbox') || document.body;
-  // Use childList and subtree to catch new paragraphs added inside existing wrappers
   chatObserver = new MutationObserver(() => _processChatMessages());
   chatObserver.observe(observeTarget, { childList: true, subtree: true });
   _processChatMessages();
@@ -566,14 +599,10 @@ function stopChatObserver() {
 }
 
 function _processChatMessages() {
-  // Rather than iterating over wrappers (which group consecutive messages from one user),
-  // we iterate over the actual message text paragraphs so we don't miss grouped messages.
   document.querySelectorAll(CHAT_SELECTORS.messageText).forEach((pEl) => {
     if (_processedMessages.has(pEl)) return;
     _processedMessages.add(pEl);
 
-    // Find the sender name from the overall message group
-    // Jitsi omits the display name on consecutive messages, but the parent group always has it in its first message
     const msgGroup = pEl.closest(CHAT_SELECTORS.messageGroup);
     if (!msgGroup) return;
 
@@ -582,8 +611,6 @@ function _processChatMessages() {
 
     const senderName = senderEl.textContent.trim();
     
-    // Jitsi includes a <span class="sr-only">Sender says:</span> inside the paragraph.
-    // We clone the paragraph, remove the sr-only span, and then extract the text.
     const bodyClone = pEl.cloneNode(true);
     const srSpan = bodyClone.querySelector('.sr-only');
     if (srSpan) srSpan.remove();
