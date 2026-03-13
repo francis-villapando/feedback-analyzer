@@ -77,9 +77,16 @@ const DatabaseService = {
   saveConsent(participantName, response, callback) {
     this._load((session) => {
       if (!session) return;
+      
+      // Prevent saving and broadcasting if the vote hasn't actually changed.
+      // This prevents infinite MutationObserver loops while allowing users to change their votes.
+      if (session.consents[participantName] === response) {
+        return; 
+      }
+
       session.consents[participantName] = response;
       this._save(session, () => {
-        console.log(`[FA:DB] Consent saved — ${participantName}: ${response}`);
+        console.log(`[FA:DB] Consent saved/updated — ${participantName}: ${response}`);
         if (callback) callback(session);
       });
     });
@@ -476,8 +483,6 @@ function stopPollObserver() {
   if (pollObserver) { pollObserver.disconnect(); pollObserver = null; }
 }
 
-const _processedVoters = new Set();
-
 function _processPollResults() {
   const pollCard = document.querySelector(POLL_SELECTORS.pollContainer);
 
@@ -532,12 +537,6 @@ function _processPollResults() {
       const name = voterEl.textContent.trim();
       if (!name) return;
 
-      // Deduplicate to prevent infinite MutationObserver loops
-      const voterKey = `${name}:${response}`;
-      if (_processedVoters.has(voterKey)) return;
-      _processedVoters.add(voterKey);
-
-      console.log(`[FA:POLL] Saving consent — name: "${name}", response: ${response}`);
       DatabaseService.saveConsent(name, response, () => refreshParticipantsBadge());
     });
   });
