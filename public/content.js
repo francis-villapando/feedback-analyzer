@@ -451,19 +451,24 @@ function updateConsentButton(sent = true) {
   }
 }
 
-// Observers for Poll Responses and Chat Messages
+// Selectors confirmed from Jitsi's poll RESULTS card (the view after Skip is clicked).
+// This is a completely different DOM structure from the voting card.
 const POLL_SELECTORS = {
-  resultsContainer: '[data-testid="polls-results"], .poll-results, #polls-results',
-  answerRow: '[data-testid^="polls-answer"], .poll-answer-row',
-  answerLabel: '[data-testid="polls-answer-label"], .poll-answer-label, span',
-  voterItem: '[data-testid="polls-voter"], .polls-voter, .vote-item, li',
+  pollContainer: 'div.css-8h8cwl-container',       // Outer poll card (stays in DOM after Skip)
+  resultList:    'ul.css-1y07j3x-resultList',       // Results list container
+  answerRow:     'ul.css-1y07j3x-resultList > li',  // Each answer result row (plain li)
+  answerLabel:   'div.css-sf4n65-answerName',        // Answer text label inside each row
+  // Voter names appear inside each li when someone votes.
+  // The exact element is still unknown — diagnostic log in _processPollResults will reveal it.
 };
 
 function startPollObserver() {
   if (pollObserver) return;
-  const observeTarget = document.querySelector(POLL_SELECTORS.resultsContainer) || document.querySelector('#new-toolbox') || document.body;
+  // Always watch document.body — the poll card is dismissed after Skip is clicked,
+  // so watching it directly would cause the observer to miss vote results entirely.
   pollObserver = new MutationObserver(() => _processPollResults());
-  pollObserver.observe(observeTarget, { childList: true, subtree: true });
+  pollObserver.observe(document.body, { childList: true, subtree: true });
+  console.log('[FA] Poll observer started on document.body');
   _processPollResults();
 }
 
@@ -472,18 +477,61 @@ function stopPollObserver() {
 }
 
 function _processPollResults() {
+  const pollCard = document.querySelector(POLL_SELECTORS.pollContainer);
+
+  // If there's a "Show details" button, we need to click it to reveal the voter names.
+  // We'll only click it once to avoid an infinite loop of observer triggers.
+  if (pollCard && !pollCard.dataset.detailsClicked) {
+    const showDetailsBtn = Array.from(pollCard.querySelectorAll('button')).find(
+      btn => btn.textContent.trim().toLowerCase() === 'show details'
+    );
+    if (showDetailsBtn) {
+      console.log('[FA:POLL] Found "Show details" button, clicking to reveal names hidden by Jitsi...');
+      pollCard.dataset.detailsClicked = 'true';
+      showDetailsBtn.click();
+      return; // The click will trigger another mutation, which will process the updated DOM.
+    }
+  }
+
   const answerRows = document.querySelectorAll(POLL_SELECTORS.answerRow);
-  if (answerRows.length === 0) return;
+  if (answerRows.length === 0) {
+    if (pollCard) console.log('[FA:POLL] Poll card visible but no result rows found yet');
+    return;
+  }
+
   answerRows.forEach((row) => {
     const labelEl = row.querySelector(POLL_SELECTORS.answerLabel);
     const labelText = labelEl ? labelEl.textContent.trim().toLowerCase() : '';
+
     let response = null;
-    if (labelText.includes('yes') || labelText.includes('consent')) response = 'yes';
-    else if (labelText.includes('no') || labelText.includes("don't")) response = 'no';
+    if (labelText.startsWith('yes')) response = 'yes';
+    else if (labelText.startsWith('no')) response = 'no';
     if (!response) return;
-    row.querySelectorAll(POLL_SELECTORS.voterItem).forEach((voterEl) => {
+
+    // Diagnostic: log each result row's innerHTML so we can see where voter names appear.
+    console.log(`[FA:POLL] Result row (${response}), innerHTML:`, row.innerHTML);
+
+    // Collect voter names from any div/span/li children that aren't the answer label or count.
+    const candidateVoters = Array.from(row.querySelectorAll('div, span, li'))
+      .filter(el => {
+        const text = el.textContent.trim();
+        return text.length > 0 && text.length < 60
+          && !text.toLowerCase().includes('consent')
+          && !text.toLowerCase().includes("don't")
+          && !text.match(/^\d+\s*\([\d.]+%\)$/); // Exclude "0 (0%)" vote count strings
+      });
+
+    if (candidateVoters.length === 0) {
+      console.log(`[FA:POLL] "${labelText}" — no voter names yet`);
+      return;
+    }
+
+    candidateVoters.forEach((voterEl) => {
       const name = voterEl.textContent.trim();
-      if (name) DatabaseService.saveConsent(name, response, () => refreshParticipantsBadge());
+      if (name) {
+        console.log(`[FA:POLL] Saving consent — name: "${name}", response: ${response}`);
+        DatabaseService.saveConsent(name, response, () => refreshParticipantsBadge());
+      }
     });
   });
 }
