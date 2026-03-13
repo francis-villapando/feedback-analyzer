@@ -95,6 +95,7 @@ const DatabaseService = {
       } else if (response === 'yes' && previousVote === 'yes') {
         console.log(`[FA:DB] Participant ${participantName} already has consent recorded`);
       } else if (response === 'no' || response === 'multiple') {
+        // Always call callback to update UI, regardless of whether consent existed
         if (session.consents[participantName]) {
           delete session.consents[participantName];
           this._save(session, () => {
@@ -102,7 +103,11 @@ const DatabaseService = {
             if (callback) callback(session);
           });
         } else {
-          console.log(`[FA:DB] Participant ${participantName} voted "${response}", not saved as consent`);
+          // Even if no consent existed, call callback to update the counter
+          this._save(session, () => {
+            console.log(`[FA:DB] Participant ${participantName} voted "${response}", not saved as consent`);
+            if (callback) callback(session);
+          });
         }
       }
     });
