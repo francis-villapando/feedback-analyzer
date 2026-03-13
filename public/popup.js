@@ -268,6 +268,14 @@ function init() {
   // Populate courses dropdown
   populateCourses();
   
+  // Reset to default placeholder values - do not restore saved selections
+  selectedCourse = null;
+  selectedCourseName = null;
+  selectedTopic = null;
+  courseSelect.value = '';
+  topicSelect.value = '';
+  updateTopicDropdownState();
+  
   // Check current tab and get state
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     if (!tabs[0] || !tabs[0].url || !tabs[0].url.includes('meet.jit.si')) {
@@ -275,9 +283,8 @@ function init() {
       return;
     }
     
-    // Load saved selections first
-    loadSelections(() => {
-      chrome.tabs.sendMessage(tabs[0].id, { action: "getState" }, (response) => {
+    // Get state from content script without loading saved selections
+    chrome.tabs.sendMessage(tabs[0].id, { action: "getState" }, (response) => {
         if (chrome.runtime.lastError) {
           console.log('Content script not found or error:', chrome.runtime.lastError);
           setMeetingInactiveUI();
@@ -288,24 +295,8 @@ function init() {
           isEnabled = response.isEnabled;
           isMeetingActive = response.isMeetingActive;
           
-          // Update selections from content script state if available
-          if (response.selectedCourse) {
-            selectedCourse = response.selectedCourse;
-            selectedCourseName = response.courseName;
-            selectedTopic = response.selectedTopic;
-            
-            // Restore dropdown values if they match
-            if (courseSelect.value !== selectedCourse) {
-              courseSelect.value = selectedCourse || '';
-              if (selectedCourse) {
-                populateTopics(selectedCourse);
-              }
-            }
-            if (selectedTopic && topicSelect.value !== selectedTopic) {
-              topicSelect.value = selectedTopic;
-            }
-            updateTopicDropdownState();
-          }
+          // Note: We don't restore course/topic selections from content script
+          // The popup always starts with placeholder values
           
           if (isMeetingActive) {
             setMeetingActiveUI();
@@ -317,7 +308,6 @@ function init() {
         }
       });
     });
-  });
 }
 
 // Event listeners
