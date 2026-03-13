@@ -476,6 +476,8 @@ function stopPollObserver() {
   if (pollObserver) { pollObserver.disconnect(); pollObserver = null; }
 }
 
+const _processedVoters = new Set();
+
 function _processPollResults() {
   const pollCard = document.querySelector(POLL_SELECTORS.pollContainer);
 
@@ -509,7 +511,7 @@ function _processPollResults() {
     if (!response) return;
 
     // Diagnostic: log each result row's innerHTML so we can see where voter names appear.
-    console.log(`[FA:POLL] Result row (${response}), innerHTML:`, row.innerHTML);
+    // console.log(`[FA:POLL] Result row (${response}), innerHTML:`, row.innerHTML);
 
     // Collect voter names from any div/span/li children that aren't the answer label or count.
     const candidateVoters = Array.from(row.querySelectorAll('div, span, li'))
@@ -528,10 +530,15 @@ function _processPollResults() {
 
     candidateVoters.forEach((voterEl) => {
       const name = voterEl.textContent.trim();
-      if (name) {
-        console.log(`[FA:POLL] Saving consent — name: "${name}", response: ${response}`);
-        DatabaseService.saveConsent(name, response, () => refreshParticipantsBadge());
-      }
+      if (!name) return;
+
+      // Deduplicate to prevent infinite MutationObserver loops
+      const voterKey = `${name}:${response}`;
+      if (_processedVoters.has(voterKey)) return;
+      _processedVoters.add(voterKey);
+
+      console.log(`[FA:POLL] Saving consent — name: "${name}", response: ${response}`);
+      DatabaseService.saveConsent(name, response, () => refreshParticipantsBadge());
     });
   });
 }
