@@ -17,6 +17,7 @@ const status = document.getElementById('status');
 function setDisabledUI(message) {
   masterToggle.disabled = true;
   masterToggle.classList.remove('active');
+  masterToggle.textContent = 'Enable Analyzer';
   status.textContent = message;
   status.classList.add('warning');
   status.classList.remove('active');
@@ -31,6 +32,7 @@ function setDisabledUI(message) {
 function setMeetingInactiveUI() {
   masterToggle.disabled = true;
   masterToggle.classList.remove('active');
+  masterToggle.textContent = 'Enable Analyzer';
   status.textContent = 'Please join a meeting first';
   status.classList.add('warning');
   status.classList.remove('active');
@@ -54,17 +56,25 @@ function setMeetingActiveUI() {
   
   if (isEnabled) {
     masterToggle.classList.add('active');
+    masterToggle.classList.remove('enabled');
+    masterToggle.textContent = 'Disable Analyzer';
     status.textContent = 'Analyzer is active';
     status.classList.add('active');
   } else {
     masterToggle.classList.remove('active');
     if (selectedCourse && selectedTopic) {
+      masterToggle.classList.add('enabled');
+      masterToggle.textContent = 'Enable Analyzer';
       status.textContent = 'Analyzer is disabled';
       status.classList.remove('active');
     } else if (selectedCourse) {
+      masterToggle.classList.remove('enabled');
+      masterToggle.textContent = 'Enable Analyzer';
       status.textContent = 'Please select a topic';
       status.classList.remove('active');
     } else {
+      masterToggle.classList.remove('enabled');
+      masterToggle.textContent = 'Enable Analyzer';
       status.textContent = 'Please select course & topic first';
       status.classList.remove('active');
     }
@@ -75,8 +85,19 @@ function updateToggleState() {
   // Toggle is enabled only when both course and topic are selected
   if (selectedCourse && selectedTopic) {
     masterToggle.disabled = false;
+    if (isEnabled) {
+      masterToggle.classList.add('active');
+      masterToggle.classList.remove('enabled');
+      masterToggle.textContent = 'Disable Analyzer';
+    } else {
+      masterToggle.classList.remove('active');
+      masterToggle.classList.add('enabled');
+      masterToggle.textContent = 'Enable Analyzer';
+    }
   } else {
     masterToggle.disabled = true;
+    masterToggle.classList.remove('active', 'enabled');
+    masterToggle.textContent = 'Enable Analyzer';
   }
 }
 
@@ -208,9 +229,15 @@ function handleTopicChange() {
   // Update status message
   if (selectedTopic) {
     if (isEnabled) {
+      masterToggle.classList.add('active');
+      masterToggle.classList.remove('enabled');
+      masterToggle.textContent = 'Disable Analyzer';
       status.textContent = 'Analyzer is active';
       status.classList.add('active');
     } else {
+      masterToggle.classList.remove('active');
+      masterToggle.classList.add('enabled');
+      masterToggle.textContent = 'Enable Analyzer';
       status.textContent = 'Analyzer is disabled';
       status.classList.remove('active');
     }
