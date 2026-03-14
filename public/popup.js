@@ -1,62 +1,10 @@
-// Course and topic data structure
-const courseTopics = {
-  dsa: {
-    name: "Data Structures & Algorithms",
-    topics: [
-      "Arrays", "Linked Lists", "Stacks", "Queues", "Trees",
-      "Binary Trees", "Binary Search Trees", "Heaps", "Hash Tables",
-      "Graphs", "Sorting Algorithms", "Searching Algorithms",
-      "Dynamic Programming", "Recursion", "Big O Notation"
-    ]
-  },
-  gameProgramming: {
-    name: "Game Programming",
-    topics: [
-      "Game Loops", "Physics Engine", "Collision Detection",
-      "Sprite Animation", "AI Behavior", "Level Design",
-      "Input Handling", "Audio Systems", "Graphics Rendering"
-    ]
-  },
-  networking: {
-    name: "Computer Networking",
-    topics: [
-      "OSI Model", "TCP/IP", "HTTP/HTTPS", "DNS", "Routing",
-      "Subnetting", "Firewalls", "VPN", "Wireless Networks",
-      "Network Security", "Socket Programming"
-    ]
-  },
-  webDevelopment: {
-    name: "Web Development",
-    topics: [
-      "HTML/CSS", "JavaScript", "DOM Manipulation", "React/Vue/Angular",
-      "REST APIs", "Node.js", "Database Integration", "Authentication",
-      "Responsive Design", "Web Performance", "SEO"
-    ]
-  },
-  database: {
-    name: "Database Systems",
-    topics: [
-      "SQL Queries", "Database Design", "Normalization", "Indexing",
-      "Transactions", "ACID Properties", "NoSQL", "MongoDB",
-      "Data Warehousing", "ER Diagrams"
-    ]
-  },
-  operatingSystems: {
-    name: "Operating Systems",
-    topics: [
-      "Process Management", "Memory Management", "CPU Scheduling",
-      "File Systems", "Deadlocks", "Synchronization",
-      "Virtual Memory", "Paging", "Threading", "I/O Management"
-    ]
-  }
-};
-
 // State variables
 let isEnabled = false;
 let isMeetingActive = false;
 let selectedCourse = null;
 let selectedCourseName = null;
 let selectedTopic = null;
+let courseTopics = {};
 
 // DOM Elements
 const courseSelect = document.getElementById('courseSelect');
@@ -148,32 +96,43 @@ function updateTopicDropdownState() {
 
 // Populate dropdowns
 
-function populateCourses() {
-  // Clear existing options except first
-  courseSelect.innerHTML = '<option value="">Select a course...</option>';
-  
-  for (const [key, value] of Object.entries(courseTopics)) {
-    const option = document.createElement('option');
-    option.value = key;
-    option.textContent = value.name;
-    courseSelect.appendChild(option);
+async function populateCourses() {
+  console.log('populateCourses called');
+  try {
+    const response = await fetch('http://localhost:8000/courses');
+    console.log('Response status:', response.status);
+    const courses = await response.json();
+    console.log('Courses data:', courses);
+    
+    courseSelect.innerHTML = '<option value="">Select a course...</option>';
+    
+    for (const course of courses) {
+      const option = document.createElement('option');
+      option.value = course.id;
+      option.textContent = course.name;
+      courseSelect.appendChild(option);
+    }
+    console.log('Dropdown populated with', courses.length, 'courses');
+  } catch (error) {
+    console.error('Error loading courses:', error);
   }
 }
 
-function populateTopics(courseKey) {
-  // Clear existing options except first
-  topicSelect.innerHTML = '<option value="">Select a topic...</option>';
-  
-  if (!courseKey || !courseTopics[courseKey]) {
-    return;
-  }
-  
-  const topics = courseTopics[courseKey].topics;
-  for (const topic of topics) {
-    const option = document.createElement('option');
-    option.value = topic;
-    option.textContent = topic;
-    topicSelect.appendChild(option);
+async function populateTopics(courseId) {
+  try {
+    const response = await fetch(`http://localhost:8000/courses/${courseId}/topics`);
+    const topics = await response.json();
+    
+    topicSelect.innerHTML = '<option value="">Select a topic...</option>';
+    
+    for (const topic of topics) {
+      const option = document.createElement('option');
+      option.value = topic.id;
+      option.textContent = topic.name;
+      topicSelect.appendChild(option);
+    }
+  } catch (error) {
+    console.error('Error loading topics:', error);
   }
 }
 
@@ -217,6 +176,7 @@ function loadSelections(callback) {
 
 function handleCourseChange() {
   selectedCourse = courseSelect.value;
+  selectedCourseName = courseTopics[selectedCourse]?.name;
   selectedTopic = null;
   
   // Populate topics based on selected course
@@ -294,10 +254,6 @@ function init() {
         if (response !== undefined) {
           isEnabled = response.isEnabled;
           isMeetingActive = response.isMeetingActive;
-          
-          // Note: We don't restore course/topic selections from content script
-          // The popup always starts with placeholder values
-          
           if (isMeetingActive) {
             setMeetingActiveUI();
           } else {
