@@ -5,6 +5,7 @@ let selectedCourse = null;
 let selectedCourseName = null;
 let selectedTopic = null;
 let courseTopics = {};
+let currentMeetingUrl = null;
 
 // DOM Elements
 const courseSelect = document.getElementById('courseSelect');
@@ -134,8 +135,10 @@ async function populateCourses() {
       courseSelect.appendChild(option);
     }
     console.log('Dropdown populated with', courses.length, 'courses');
+    return courses;
   } catch (error) {
     console.error('Error loading courses:', error);
+    return [];
   }
 }
 
@@ -152,42 +155,62 @@ async function populateTopics(courseId) {
       option.textContent = topic.name;
       topicSelect.appendChild(option);
     }
+    return topics;
   } catch (error) {
     console.error('Error loading topics:', error);
+    return [];
   }
 }
 
 // Storage functions
 
-function saveSelections() {
+function saveSelections(meetingUrl) {
   const selection = {
     course: selectedCourse,
     courseName: selectedCourse ? courseTopics[selectedCourse]?.name || selectedCourseName : null,
     topic: selectedTopic,
+    meetingUrl: meetingUrl,
     timestamp: Date.now()
   };
   
   chrome.storage.local.set({ courseSelection: selection });
 }
 
-function loadSelections(callback) {
+function clearSelections() {
+  chrome.storage.local.remove(['courseSelection']);
+  selectedCourse = null;
+  selectedCourseName = null;
+  selectedTopic = null;
+}
+
+function loadSelections(meetingUrl, callback) {
   chrome.storage.local.get(['courseSelection'], (result) => {
     if (result.courseSelection) {
-      selectedCourse = result.courseSelection.course;
-      selectedCourseName = result.courseSelection.courseName;
-      selectedTopic = result.courseSelection.topic;
-      
-      // Restore dropdown values
-      if (selectedCourse) {
-        courseSelect.value = selectedCourse;
-        populateTopics(selectedCourse);
+      // Verify this is the same meeting URL
+      if (result.courseSelection.meetingUrl === meetingUrl) {
+        selectedCourse = result.courseSelection.course;
+        selectedCourseName = result.courseSelection.courseName;
+        selectedTopic = result.courseSelection.topic;
         
-        if (selectedTopic) {
-          topicSelect.value = selectedTopic;
+        // Restore dropdown values
+        if (selectedCourse) {
+          courseSelect.value = selectedCourse;
+          // Populate topics and then set the selected topic
+          populateTopics(selectedCourse).then(() => {
+            if (selectedTopic) {
+              topicSelect.value = selectedTopic;
+            }
+            updateTopicDropdownState();
+            callback();
+          });
+          return; // Return early to avoid callback being called twice
         }
+        
+        updateTopicDropdownState();
+      } else {
+        // Different meeting URL - clear selections
+        clearSelections();
       }
-      
-      updateTopicDropdownState();
     }
     callback();
   });
@@ -217,7 +240,7 @@ function handleCourseChange() {
   }
   
   // Save selections
-  saveSelections();
+  saveSelections(currentMeetingUrl);
 }
 
 function handleTopicChange() {
@@ -246,16 +269,16 @@ function handleTopicChange() {
   }
   
   // Save selections
-  saveSelections();
+  saveSelections(currentMeetingUrl);
 }
 
 // Initialize
 
-function init() {
+async function init() {
   // Populate courses dropdown
-  populateCourses();
+  await populateCourses();
   
-  // Reset to default placeholder values - do not restore saved selections
+  // Reset to default placeholder values - will load from storage after verifying meeting
   selectedCourse = null;
   selectedCourseName = null;
   selectedTopic = null;
@@ -270,7 +293,10 @@ function init() {
       return;
     }
     
-    // Get state from content script without loading saved selections
+    // Store the current meeting URL
+    currentMeetingUrl = tabs[0].url;
+    
+    // Get state from content script
     chrome.tabs.sendMessage(tabs[0].id, { action: "getState" }, (response) => {
         if (chrome.runtime.lastError) {
           console.log('Content script not found or error:', chrome.runtime.lastError);
@@ -281,9 +307,15 @@ function init() {
         if (response !== undefined) {
           isEnabled = response.isEnabled;
           isMeetingActive = response.isMeetingActive;
+          
           if (isMeetingActive) {
-            setMeetingActiveUI();
+            // Load saved selections for this meeting
+            loadSelections(currentMeetingUrl, () => {
+              setMeetingActiveUI();
+            });
           } else {
+            // Clear selections when not in a meeting
+            clearSelections();
             setMeetingInactiveUI();
           }
         } else {
@@ -323,6 +355,15 @@ masterToggle.addEventListener('click', () => {
         if (response) {
           isEnabled = response.isEnabled;
           isMeetingActive = response.isMeetingActive;
+          
+          // Clear selections if analyzer was disabled (turned off)
+          if (!isEnabled) {
+            clearSelections();
+            courseSelect.value = '';
+            topicSelect.value = '';
+            updateTopicDropdownState();
+          }
+          
           setMeetingActiveUI();
         }
       }

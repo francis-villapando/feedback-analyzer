@@ -690,5 +690,24 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     sendResponse({ isEnabled, isMeetingActive: isMeetingActive(), selectedCourse, selectedCourseName, selectedTopic });
     return true;
   }
+  if (msg.action === 'meetingEnded') {
+    // Clear selections when meeting ends
+    chrome.storage.local.remove(['courseSelection']);
+    isEnabled = false;
+    sendResponse({ success: true });
+    return true;
+  }
   return true;
 });
+
+// Detect meeting end and notify popup to clear selections
+let previousMeetingState = isMeetingActive();
+setInterval(() => {
+  const currentMeetingState = isMeetingActive();
+  if (previousMeetingState && !currentMeetingState) {
+    // Meeting ended - clear selections
+    chrome.storage.local.remove(['courseSelection']);
+    console.log('Meeting ended - selections cleared');
+  }
+  previousMeetingState = currentMeetingState;
+}, 1000);
