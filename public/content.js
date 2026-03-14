@@ -26,21 +26,63 @@ const DatabaseService = {
   },
 
   /** Initializes a new session with course and topic metadata. */
-  startSession(course, courseName, topic, callback) {
-    const session = {
-      id: 'session-' + Date.now(),
-      course,
-      courseName,
-      topic,
-      startedAt: Date.now(),
-      consentPollSent: false,
-      consentPollId: null,
-      consents: {},
-      feedbacks: [],
-    };
-    this._save(session, () => {
-      console.log('[FA:DB] Session started:', session.id);
-      if (callback) callback(session);
+  startSession(meetLink, courseId, topicId, callback) {
+    // First, create session on the server
+    fetch('http://localhost:8000/sessions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        meet_link: meetLink,
+        course_id: courseId,
+        topic_id: topicId
+      })
+    })
+    .then(res => res.json())
+    .then(data => {
+      const session = {
+        id: data.session_id,  // Use server-generated UUID
+        meetLink: meetLink,
+        course: courseId,
+        topic: topicId,
+        startedAt: Date.now(),
+        consentPollSent: false,
+        consentPollId: null,
+        consents: {},
+        feedbacks: [],
+      };
+      this._save(session, () => {
+        console.log('[FA:DB] Session started with server ID:', session.id);
+        if (callback) callback(session);
+      });
+    })
+    .catch(err => {
+      console.error('[FA:DB] Failed to create session on server:', err);
+    });
+  },
+
+  /** Ends the current session on the server. */
+  endSession(callback) {
+    this._load((session) => {
+      if (!session || !session.id) {
+        console.log('[FA:DB] No active session to end');
+        if (callback) callback();
+        return;
+      }
+      
+      // Call server to end session
+      fetch(`http://localhost:8000/sessions/${session.id}/end`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' }
+      })
+      .then(res => res.json())
+      .then(data => {
+        console.log('[FA:DB] Session ended on server:', session.id);
+        if (callback) callback();
+      })
+      .catch(err => {
+        console.error('[FA:DB] Failed to end session on server:', err);
+        if (callback) callback();
+      });
     });
   },
 
@@ -681,8 +723,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     selectedCourseName = msg.courseName || null;
     selectedTopic = msg.topic || null;
     isEnabled = !isEnabled;
-    if (isEnabled) DatabaseService.startSession(selectedCourse, selectedCourseName, selectedTopic, () => injectJitsiToggleButton());
-    else { stopObservers(); removeJitsiToggleButton(); consentPollSent = false; DatabaseService.clearSession(); }
+    if (isEnabled) {
+      const meetLink = window.location.href;
+      DatabaseService.startSession(meetLink, selectedCourse, selectedTopic, () => injectJitsiToggleButton());
+    } else {
+      DatabaseService.endSession(() => {
+        stopObservers();
+        removeJitsiToggleButton();
+        consentPollSent = false;
+        DatabaseService.clearSession();
+      });
+    }
     sendResponse({ success: true, isEnabled, isMeetingActive: true });
     return true;
   }
