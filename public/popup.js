@@ -30,6 +30,22 @@ function setDisabledUI(message) {
   topicSelect.classList.remove('enabled');
 }
 
+function lockDropdowns() {
+  courseSelect.disabled = true;
+  topicSelect.disabled = true;
+  courseSelect.classList.remove('enabled');
+  topicSelect.classList.remove('enabled');
+}
+
+function unlockDropdowns() {
+  courseSelect.disabled = false;
+  courseSelect.classList.add('enabled');
+  if (selectedCourse) {
+    topicSelect.disabled = false;
+    topicSelect.classList.add('enabled');
+  }
+}
+
 function setMeetingInactiveUI() {
   masterToggle.disabled = true;
   masterToggle.classList.remove('active');
@@ -59,6 +75,8 @@ function setMeetingActiveUI() {
     masterToggle.classList.add('active');
     masterToggle.classList.remove('enabled');
     masterToggle.textContent = 'Disable Analyzer';
+    // Lock dropdowns when analyzer is enabled
+    lockDropdowns();
     status.textContent = 'Analyzer is active';
     status.classList.add('active');
   } else {
@@ -66,16 +84,20 @@ function setMeetingActiveUI() {
     if (selectedCourse && selectedTopic) {
       masterToggle.classList.add('enabled');
       masterToggle.textContent = 'Enable Analyzer';
+      // Unlock dropdowns when analyzer is disabled
+      unlockDropdowns();
       status.textContent = 'Analyzer is disabled';
       status.classList.remove('active');
     } else if (selectedCourse) {
       masterToggle.classList.remove('enabled');
       masterToggle.textContent = 'Enable Analyzer';
+      unlockDropdowns();
       status.textContent = 'Please select a topic';
       status.classList.remove('active');
     } else {
       masterToggle.classList.remove('enabled');
       masterToggle.textContent = 'Enable Analyzer';
+      unlockDropdowns();
       status.textContent = 'Please select course & topic first';
       status.classList.remove('active');
     }
