@@ -128,7 +128,38 @@ const DatabaseService = {
       
       participantVotes[participantName] = response;
       
-      if (response === 'yes' && previousVote !== 'yes') {
+      // Only save to server if response is "yes"
+      if (response === 'yes') {
+        // Save poll response to server (only for yes votes)
+        fetch('http://localhost:8000/poll-responses', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            session_id: session.id,
+            participant_name: participantName,
+            poll_question: 'Do you consent to data collection?',
+            poll_answer: response
+          })
+        })
+        .then(res => res.json())
+        .catch(err => console.error('[FA:DB] Failed to save poll response:', err));
+        
+        // Save consent to server
+        fetch('http://localhost:8000/consents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            session_id: session.id,
+            participant_name: participantName,
+            consent_given: true
+          })
+        })
+        .then(res => res.json())
+        .then(data => {
+          console.log(`[FA:DB] Consent saved to server for ${participantName}`);
+        })
+        .catch(err => console.error('[FA:DB] Failed to save consent:', err));
+        
         session.consents[participantName] = 'yes';
         this._save(session, () => {
           console.log(`[FA:DB] Consent recorded for ${participantName}`);
@@ -137,19 +168,15 @@ const DatabaseService = {
       } else if (response === 'yes' && previousVote === 'yes') {
         console.log(`[FA:DB] Participant ${participantName} already has consent recorded`);
       } else if (response === 'no' || response === 'multiple') {
-        // Always call callback to update UI, regardless of whether consent existed
+        // Remove consent from local tracking (data already saved stays on server)
         if (session.consents[participantName]) {
           delete session.consents[participantName];
           this._save(session, () => {
-            console.log(`[FA:DB] Consent removed for ${participantName} (voted "${response}")`);
+            console.log(`[FA:DB] Consent removed locally for ${participantName} (voted "${response}") - existing server data preserved`);
             if (callback) callback(session);
           });
         } else {
-          // Even if no consent existed, call callback to update the counter
-          this._save(session, () => {
-            console.log(`[FA:DB] Participant ${participantName} voted "${response}", not saved as consent`);
-            if (callback) callback(session);
-          });
+          if (callback) callback(session);
         }
       }
     });
@@ -185,8 +212,33 @@ const DatabaseService = {
   saveFeedback(sender, text, callback) {
     this._load((session) => {
       if (!session) return;
+      
+      // Check if participant has consented
+      if (!session.consents || session.consents[sender] !== 'yes') {
+        console.log(`[FA:DB] Feedback from ${sender} ignored - no consent`);
+        if (callback) callback(session);
+        return;
+      }
+      
       const entry = { sender, text, timestamp: Date.now() };
       session.feedbacks.push(entry);
+      
+      // Save to server - only for consented participants
+      fetch('http://localhost:8000/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session_id: session.id,
+          participant_id: sender,
+          message: text
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        console.log(`[FA:DB] Feedback saved to server from ${sender}:`, text);
+      })
+      .catch(err => console.error('[FA:DB] Failed to save feedback to server:', err));
+      
       this._save(session, () => {
         console.log(`[FA:DB] Feedback saved from ${sender}:`, text);
         if (callback) callback(session);

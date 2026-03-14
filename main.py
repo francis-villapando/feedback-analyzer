@@ -33,6 +33,17 @@ class Feedback(BaseModel):
     participant_id: str
     message: str
 
+class Consent(BaseModel):
+    session_id: str
+    participant_name: str
+    consent_given: bool
+
+class PollResponse(BaseModel):
+    session_id: str
+    participant_name: str
+    poll_question: str
+    poll_answer: str
+
 # API endpoint to get all courses
 @app.get("/courses")
 async def get_courses():
@@ -67,10 +78,33 @@ async def end_session(session_id: str):
 async def receive_feedback(feedback: Feedback):
     data = {
         "session_id": feedback.session_id,
-        "participant_id": feedback.participant_id,
+        "participant_name": feedback.participant_id,
         "message": feedback.message
     }
     result = supabase.table("raw_feedbacks").insert(data).execute()
+    return {"status": "success", "data": result}
+
+# API endpoint to save consent (only when participant votes yes)
+@app.post("/consents")
+async def save_consent(consent: Consent):
+    data = {
+        "session_id": consent.session_id,
+        "participant_name": consent.participant_name,
+        "consent_given": consent.consent_given
+    }
+    result = supabase.table("consents").insert(data).execute()
+    return {"status": "success", "data": result}
+
+# API endpoint to save poll response
+@app.post("/poll-responses")
+async def save_poll_response(response: PollResponse):
+    data = {
+        "session_id": response.session_id,
+        "participant_name": response.participant_name,
+        "poll_question": response.poll_question,
+        "poll_answer": response.poll_answer
+    }
+    result = supabase.table("poll_responses").insert(data).execute()
     return {"status": "success", "data": result}
 
 # Run server
