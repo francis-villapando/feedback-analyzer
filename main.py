@@ -18,6 +18,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Access-Control-Allow-Origin"]
 )
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -106,6 +107,66 @@ async def save_poll_response(response: PollResponse):
     }
     result = supabase.table("poll_responses").insert(data).execute()
     return {"status": "success", "data": result}
+
+# API endpoint to delete all data for a session
+@app.delete("/sessions/{session_id}")
+async def delete_session_data(session_id: str):
+    try:
+        # Delete in the correct order following the foreign key relationships
+        # First, delete from tables that have direct session_id reference
+        
+        # For the feedback processing chain, we need to delete in cascade
+        # Get all raw_feedbacks for this session first (these have session_id)
+        raw_feedbacks_result = supabase.table("raw_feedbacks").select("id").eq("session_id", session_id).execute()
+        raw_feedback_ids = [item["id"] for item in raw_feedbacks_result.data] if raw_feedbacks_result.data else []
+        
+        if raw_feedback_ids:
+            # Delete all related records in the processing chain
+            # teaching_recommendations <- identified_problems <- categorized_feedbacks <- preprocessed_feedbacks <- raw_feedbacks
+            # We need to delete from the end of the chain backwards
+            
+            # Get preprocessed feedback IDs linked to raw feedbacks
+            preprocessed_result = supabase.table("preprocessed_feedbacks").select("id").in_("raw_feedback_id", raw_feedback_ids).execute()
+            preprocessed_ids = [item["id"] for item in preprocessed_result.data] if preprocessed_result.data else []
+            
+            # Get categorized feedback IDs linked to preprocessed feedbacks
+            categorized_result = supabase.table("categorized_feedbacks").select("id").in_("preprocessed_feedback_id", preprocessed_ids).execute()
+            categorized_ids = [item["id"] for item in categorized_result.data] if categorized_result.data else []
+            
+            # Get theme IDs linked to preprocessed feedbacks
+            theme_result = supabase.table("feedback_themes").select("id").in_("preprocessed_feedback_id", preprocessed_ids).execute()
+            theme_ids = [item["id"] for item in theme_result.data] if theme_result.data else []
+            
+            # Get problem IDs linked to categorized feedbacks
+            problem_result = supabase.table("identified_problems").select("id").in_("categorized_feedback_id", categorized_ids).execute()
+            problem_ids = [item["id"] for item in problem_result.data] if problem_result.data else []
+            
+            # Delete in reverse order
+            if problem_ids:
+                supabase.table("teaching_recommendations").delete().in_("problem_id", problem_ids).execute()
+                supabase.table("identified_problems").delete().in_("id", problem_ids).execute()
+            if theme_ids:
+                supabase.table("feedback_themes").delete().in_("id", theme_ids).execute()
+            if categorized_ids:
+                supabase.table("categorized_feedbacks").delete().in_("id", categorized_ids).execute()
+            if preprocessed_ids:
+                supabase.table("preprocessed_feedbacks").delete().in_("id", preprocessed_ids).execute()
+            
+            # Finally delete the raw feedbacks
+            supabase.table("raw_feedbacks").delete().in_("id", raw_feedback_ids).execute()
+        
+        # Delete other session-related data
+        supabase.table("poll_responses").delete().eq("session_id", session_id).execute()
+        supabase.table("consents").delete().eq("session_id", session_id).execute()
+        
+        # Finally, delete the session itself
+        supabase.table("sessions").delete().eq("id", session_id).execute()
+        
+        print(f"Deleted session {session_id} and all related data successfully")
+        return {"status": "success", "deleted_records": True}
+    except Exception as e:
+        print(f"Error deleting session {session_id}: {str(e)}")
+        return {"status": "error", "message": str(e)}
 
 # Run server
 if __name__ == "__main__":

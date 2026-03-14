@@ -69,18 +69,23 @@ const DatabaseService = {
         return;
       }
       
-      // Call server to end session
-      fetch(`http://localhost:8000/sessions/${session.id}/end`, {
-        method: 'PATCH',
+      console.log('[FA:DB] Attempting to delete session from server:', session.id);
+      
+      // Call server to delete all session data
+      fetch(`http://localhost:8000/sessions/${session.id}`, {
+        method: 'DELETE',
         headers: { 'Content-Type': 'application/json' }
       })
-      .then(res => res.json())
+      .then(res => {
+        console.log('[FA:DB] Delete response status:', res.status);
+        return res.json();
+      })
       .then(data => {
-        console.log('[FA:DB] Session ended on server:', session.id);
+        console.log('[FA:DB] Session data deletion result:', data);
         if (callback) callback();
       })
       .catch(err => {
-        console.error('[FA:DB] Failed to end session on server:', err);
+        console.error('[FA:DB] Failed to delete session data:', err);
         if (callback) callback();
       });
     });
@@ -800,17 +805,59 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     sendResponse({ success: true });
     return true;
   }
+  if (msg.action === 'extensionDisabled') {
+    // Extension disabled/uninstalled - delete server data and clear selections
+    DatabaseService.endSession(() => {
+      chrome.storage.local.remove(['courseSelection']);
+      isEnabled = false;
+      console.log('Extension disabled - server data deleted and selections cleared');
+    });
+    sendResponse({ success: true });
+    return true;
+  }
   return true;
 });
 
 // Detect meeting end and notify popup to clear selections
 let previousMeetingState = isMeetingActive();
+let previousUrl = window.location.href;
 setInterval(() => {
   const currentMeetingState = isMeetingActive();
-  if (previousMeetingState && !currentMeetingState) {
-    // Meeting ended - clear selections
+  const currentUrl = window.location.href;
+  
+  // Check if meeting state changed from active to inactive OR URL changed significantly
+  if ((previousMeetingState && !currentMeetingState) || 
+      (previousUrl !== currentUrl && !currentUrl.includes('meet.jit.si'))) {
+    // Meeting ended - clear selections and delete server data
     chrome.storage.local.remove(['courseSelection']);
-    console.log('Meeting ended - selections cleared');
+    DatabaseService.endSession(() => {
+      console.log('Meeting ended - selections cleared and server data deleted');
+    });
   }
   previousMeetingState = currentMeetingState;
+  previousUrl = currentUrl;
 }, 1000);
+
+// Additional check for when user clicks Leave Meeting button
+// Monitor for changes in the main container that indicate leaving
+const observer = new MutationObserver((mutations) => {
+  for (const mutation of mutations) {
+    if (mutation.type === 'childList') {
+      // Check if key Jitsi meeting elements are removed
+      const meetingElements = document.querySelectorAll('.filmstrip, .toolbox-content-items, #largeVideoContainer');
+      if (meetingElements.length === 0) {
+        // Critical meeting elements are gone, assume meeting ended
+        chrome.storage.local.remove(['courseSelection']);
+        DatabaseService.endSession(() => {
+          console.log('Meeting elements removed - server data deleted');
+        });
+        break;
+      }
+    }
+  }
+});
+
+observer.observe(document.body, {
+  childList: true,
+  subtree: true
+});
