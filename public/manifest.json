@@ -35,7 +35,8 @@
         "https://meet.jit.si/*"
       ],
       "js": [
-        "content.js"
+        "content.js",
+        "ui.js"
       ],
       "css": [
         "popup.css"
