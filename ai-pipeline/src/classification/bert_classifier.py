@@ -3,7 +3,7 @@ BERT Classifier Module
 
 This module provides hybrid classification for feedback messages:
 1. First applies rule-based filter for obvious patterns
-2. If unclear, uses RoBERTa zero-shot classification
+2. If unclear, uses BERT zero-shot classification
 
 Classification categories:
 - pedagogical: Feedback related to learning/teaching
@@ -27,7 +27,7 @@ try:
 except ImportError:
     # Fallback if config not available
     BERT_CONFIG = {
-        "model_name": "roberta-base",
+        "model_name": "bert-base-uncased",
         "max_length": 128,
         "batch_size": 16,
         "use_rule_based_first": True,
@@ -81,17 +81,17 @@ def load_classifier():
         # Check for GPU
         device = 0 if torch.cuda.is_available() else -1
         device_str = "GPU" if device == 0 else "CPU"
-        print(f"Loading RoBERTa classifier on {device_str}...")
+        print(f"Loading BERT classifier on {device_str}...")
         
-        # Create zero-shot classification pipeline using RoBERTa
-        # RoBERTa provides strong zero-shot classification performance
+        # Create zero-shot classification pipeline using BERT
+        # BERT provides strong zero-shot classification performance
         _classifier = pipeline(
             "zero-shot-classification",
-            model="roberta-base",
+            model="bert-base-uncased",
             device=device,
         )
         
-        print("RoBERTa classifier loaded successfully!")
+        print("BERT classifier loaded successfully!")
         return _classifier
         
     except ImportError as e:
@@ -115,9 +115,9 @@ def get_candidate_labels() -> List[str]:
     return ["pedagogical", "nonsensical"]
 
 
-def classify_with_roberta(text: str) -> Tuple[str, float]:
+def classify_with_bert(text: str) -> Tuple[str, float]:
     """
-    Classify text using RoBERTa zero-shot classification.
+    Classify text using BERT zero-shot classification.
     
     Args:
         text: Input text to classify
@@ -207,8 +207,8 @@ def classify_single(
                 model_used="rule_based"
             )
     
-    # Step 2: Use RoBERTa for classification
-    label, confidence = classify_with_roberta(text)
+    # Step 2: Use BERT for classification
+    label, confidence = classify_with_bert(text)
     
     return ClassificationResult(
         text=text,
@@ -216,7 +216,7 @@ def classify_single(
         confidence=confidence,
         rule_based_used=False,
         rule_result=classify_with_rules(text) if use_rule_based_first else None,
-        model_used="roberta_zero_shot"
+        model_used="bert_zero_shot"
     )
 
 

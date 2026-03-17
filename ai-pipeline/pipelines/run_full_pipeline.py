@@ -80,7 +80,7 @@ from src.preprocessing import preprocess
 from src.classification import classify_single, ClassificationLabel
 from src.topic_modeling import assign_topics, get_topic_info
 from src.problem_detection import detect_problem
-from src.strategy_mapping import get_strategies_for_problem
+from src.strategy_mapping import get_recommended_strategy
 
 
 # Global topic model state (for incremental processing)
@@ -125,7 +125,7 @@ def process_single_message(
     import time
     start_time = time.time()
     
-    result = PipelineResult(original_text=text)
+    result = PipelineResult(original_text=text, cleaned_text=text)
     errors = []
     
     # Stage 1: Preprocessing
@@ -177,9 +177,10 @@ def process_single_message(
     # Stage 5: Strategy Mapping
     if result.problem:
         try:
-            strategies = get_strategies_for_problem(result.problem)
-            result.all_strategies = strategies
-            result.primary_strategy = strategies[0] if strategies else ""
+            # Use RoBERTa to get the recommended strategy
+            strategy_result = get_recommended_strategy(result.problem, result.cleaned_text)
+            result.all_strategies = [strategy_result.strategy]  # Single strategy as list
+            result.primary_strategy = strategy_result.strategy
         except Exception as e:
             errors.append(f"Strategy mapping error: {e}")
             result.stage_errors.append(f"Stage 5 (Strategy Mapping): {e}")

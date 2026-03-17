@@ -3,23 +3,25 @@ Strategy Mapping Module
 
 This module provides strategy mapping functionality:
 - Maps detected problems to specific teaching strategies
-- Strategies are specific and actionable
+- Uses RoBERTa zero-shot to recommend the best strategy
 
-Problem -> Strategy mappings are predefined in configuration.
+IMPORTANT: Returns ONE strategy per problem detected.
+- If 2 problems detected → 2 strategies
+- If 1 problem detected → 1 strategy
 
 Main Functions:
-- get_strategies_for_problem(): Get strategies for a problem
-- get_primary_strategy(): Get the best strategy
-- map_problem_to_strategy(): Map single problem
-- map_problems_to_strategies(): Map multiple problems
+- get_recommended_strategy(): Get best strategy for a problem
+- map_problem_to_strategy(): Map single problem to strategy
+- map_problems_to_strategies(): Map multiple problems to strategies
 - create_full_mapping(): Full text->problem->strategy mapping
 """
 
 from .roberta_mapper import (
     StrategyResult,
     FullMappingResult,
-    get_strategy_mappings,
+    get_strategy_candidates,
     get_strategies_for_problem,
+    get_recommended_strategy,
     get_primary_strategy,
     get_all_strategies,
     map_problem_to_strategy,
