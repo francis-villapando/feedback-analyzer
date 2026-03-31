@@ -7,15 +7,15 @@
 body {
   width: 350px;
   font-family: Roboto, -apple-system, BlinkMacSystemFont, sans-serif;
-  background: #F5F5F5;
-  color: #212121;
+  background: #010100;
+  color: #E0E0E0;
 }
 
 .popup-container {
-  background: #FFFFFF;
+  background: #141515;
   border-radius: 8px;
   padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
 /* Header */
@@ -40,21 +40,21 @@ body {
 .popup-title {
   font-size: 18px;
   font-weight: 600;
-  color: #2E7D32;
+  color: #4686ec;
   line-height: 1.2;
 }
 
 .popup-subtitle {
   font-size: 12px;
   font-weight: 400;
-  color: #757575;
+  color: #A0A0A0;
   line-height: 1.3;
 }
 
 /* Divider */
 .popup-divider {
   height: 1px;
-  background: #E0E0E0;
+  background: #2A2A2A;
   margin: 16px 0;
 }
 
@@ -80,14 +80,14 @@ body {
 /* Disabled state - Gray (cannot click yet) */
 .analyzer-btn:disabled,
 .analyzer-btn.disabled {
-  background: #E0E0E0;
-  color: #9E9E9E;
+  background: #2A2A2A;
+  color: #606060;
   cursor: not-allowed;
 }
 
-/* Enabled state - Green (Enable Analyzer - can click) */
+/* Enabled state - Blue (Enable Analyzer - can click) */
 .analyzer-btn.enabled {
-  background: #2E7D32;
+  background: #4686ec;
   color: #FFFFFF;
 }
 
@@ -101,19 +101,19 @@ body {
 .status-text {
   font-size: 12px;
   font-weight: 400;
-  color: #757575;
+  color: #A0A0A0;
   margin-top: 8px;
   text-align: center;
 }
 
 /* Warning style for messages when not in meeting */
 .status-text.warning {
-  color: #D32F2F;
+  color: #EF5350;
   font-weight: 600;
 }
 
 .status-text.active {
-  color: #2E7D32;
+  color: #4686ec;
 }
 
 /* Privacy */
@@ -123,18 +123,18 @@ body {
   gap: 8px;
   width: 100%;
   padding: 10px 12px;
-  background: #F5F5F5;
-  border: 1px solid #E0E0E0;
+  background: #1E1E1E;
+  border: 1px solid #2A2A2A;
   border-radius: 8px;
   font-size: 13px;
   font-weight: 400;
-  color: #757575;
+  color: #A0A0A0;
   cursor: pointer;
   transition: background 0.15s ease;
 }
 
 .privacy-btn:hover {
-  background: #EEEEEE;
+  background: #252525;
 }
 
 .privacy-panel {
@@ -150,12 +150,12 @@ body {
 
 .privacy-panel p {
   font-size: 12px;
-  color: #757575;
+  color: #A0A0A0;
   line-height: 1.6;
-  background: #F5F5F5;
+  background: #1E1E1E;
   padding: 12px;
   border-radius: 8px;
-  border: 1px solid #E0E0E0;
+  border: 1px solid #2A2A2A;
 }
 
 /* Course/Topic Selection */
@@ -174,7 +174,7 @@ body {
 .dropdown-label {
   font-size: 13px;
   font-weight: 500;
-  color: #212121;
+  color: #E0E0E0;
 }
 
 .dropdown-select {
@@ -182,37 +182,37 @@ body {
   padding: 10px 12px;
   font-size: 14px;
   font-family: Roboto, -apple-system, BlinkMacSystemFont, sans-serif;
-  color: #212121;
-  background: #F5F5F5;
-  border: 1px solid #E0E0E0;
+  color: #E0E0E0;
+  background: #1E1E1E;
+  border: 1px solid #2A2A2A;
   border-radius: 8px;
   cursor: pointer;
   transition: background 0.2s ease, border-color 0.2s ease;
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23757575' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23A0A0A0' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 12px center;
   padding-right: 36px;
 }
 
 .dropdown-select:disabled {
-  background-color: #F5F5F5;
-  color: #9E9E9E;
+  background-color: #1E1E1E;
+  color: #606060;
   cursor: not-allowed;
-  border-color: #E0E0E0;
+  border-color: #2A2A2A;
 }
 
 .dropdown-select.enabled {
-  background-color: #FFFFFF;
-  border-color: #2E7D32;
+  background-color: #1E1E1E;
+  border-color: #4686ec;
 }
 
 .dropdown-select.enabled:hover {
-  border-color: #388E3C;
+  border-color: #5A9AFF;
 }
 
 .dropdown-select.enabled:focus {
   outline: none;
-  border-color: #2E7D32;
-  box-shadow: 0 0 0 2px rgba(46, 125, 50, 0.2);
+  border-color: #4686ec;
+  box-shadow: 0 0 0 2px rgba(70, 134, 236, 0.2);
 }

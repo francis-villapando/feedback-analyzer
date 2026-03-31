@@ -49,11 +49,11 @@
         right: 0;
         width: 340px;
         height: 100vh;
-        background: #FFFFFF;
-        border-left: 1px solid #E0E0E0;
-        box-shadow: -2px 0 8px rgba(0,0,0,0.08);
+        background: #141515;
+        border-left: 1px solid #2A2A2A;
+        box-shadow: -2px 0 8px rgba(0,0,0,0.4);
         font-family: Roboto, -apple-system, BlinkMacSystemFont, sans-serif;
-        color: #212121;
+        color: #E0E0E0;
         z-index: 10000;
         display: flex;
         flex-direction: column;
@@ -61,43 +61,43 @@
         animation: jai-slide-in 0.25s ease-out;
       }
       @keyframes jai-slide-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
-      .jai-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #E0E0E0; flex-shrink: 0; }
-      .jai-header-title { font-size: 18px; font-weight: 600; color: #2E7D32; }
-      .jai-close-btn { width: 28px; height: 28px; border: none; background: #F5F5F5; border-radius: 50%; cursor: pointer; font-size: 16px; color: #757575; display: flex; align-items: center; justify-content: center; transition: background 0.15s; }
-      .jai-close-btn:hover { background: #E0E0E0; }
+      .jai-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #2A2A2A; flex-shrink: 0; }
+      .jai-header-title { font-size: 18px; font-weight: 600; color: #4686ec; }
+      .jai-close-btn { width: 28px; height: 28px; border: none; background: #1E1E1E; border-radius: 50%; cursor: pointer; font-size: 16px; color: #A0A0A0; display: flex; align-items: center; justify-content: center; transition: background 0.15s; }
+      .jai-close-btn:hover { background: #252525; }
       .jai-content { flex: 1; overflow-y: auto; padding: 20px; }
       .jai-content::-webkit-scrollbar { width: 4px; }
-      .jai-content::-webkit-scrollbar-thumb { background: #E0E0E0; border-radius: 2px; }
+      .jai-content::-webkit-scrollbar-thumb { background: #2A2A2A; border-radius: 2px; }
       .jai-counts { display: flex; gap: 12px; margin-bottom: 20px; }
-      .jai-count-badge { display: flex; align-items: center; gap: 6px; padding: 8px 14px; background: #F5F5F5; border: 1px solid #E0E0E0; border-radius: 8px; font-size: 14px; font-weight: 500; color: #212121; cursor: default; flex: 1; justify-content: center; transition: background 0.15s; }
-      .jai-count-badge:hover { background: #EEEEEE; }
-      .jai-count-num { font-weight: 600; color: #2E7D32; }
-      .jai-count-badge svg { width: 18px; height: 18px; color: #2E7D32; }
-      .jai-popup { position: absolute; top: -10px; right: 100%; margin-right: 8px; width: 200px; max-height: 200px; background: #FFFFFF; border: 1px solid #E0E0E0; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); padding: 12px; z-index: 10001; opacity: 0; pointer-events: none; transform: translateX(4px); transition: opacity 0.2s ease, transform 0.2s ease; overflow-y: auto; }
+      .jai-count-badge { display: flex; align-items: center; gap: 6px; padding: 8px 14px; background: #1E1E1E; border: 1px solid #2A2A2A; border-radius: 8px; font-size: 14px; font-weight: 500; color: #E0E0E0; cursor: default; flex: 1; justify-content: center; transition: background 0.15s; }
+      .jai-count-badge:hover { background: #252525; }
+      .jai-count-num { font-weight: 600; color: #4686ec; }
+      .jai-count-badge svg { width: 18px; height: 18px; color: #4686ec; }
+      .jai-popup { position: absolute; top: -10px; right: 100%; margin-right: 8px; width: 200px; max-height: 200px; background: #141515; border: 1px solid #2A2A2A; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.4); padding: 12px; z-index: 10001; opacity: 0; pointer-events: none; transform: translateX(4px); transition: opacity 0.2s ease, transform 0.2s ease; overflow-y: auto; }
       .jai-popup::-webkit-scrollbar { width: 4px; }
-      .jai-popup::-webkit-scrollbar-thumb { background: #E0E0E0; border-radius: 2px; }
-      .jai-popup-title { font-size: 12px; font-weight: 600; color: #2E7D32; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
-      .jai-popup-item { font-size: 13px; color: #212121; padding: 4px 0; border-bottom: 1px solid #F5F5F5; line-height: 1.4; }
+      .jai-popup::-webkit-scrollbar-thumb { background: #2A2A2A; border-radius: 2px; }
+      .jai-popup-title { font-size: 12px; font-weight: 600; color: #4686ec; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+      .jai-popup-item { font-size: 13px; color: #E0E0E0; padding: 4px 0; border-bottom: 1px solid #2A2A2A; line-height: 1.4; }
       .jai-popup-item:last-child { border-bottom: none; }
       .jai-section { margin-bottom: 20px; }
-      .jai-section-title { font-size: 12px; font-weight: 600; color: #757575; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
-      .jai-item { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; padding: 10px 12px; background: #FFFFFF; border: 1px solid #F5F5F5; border-radius: 8px; margin-bottom: 6px; font-size: 14px; line-height: 1.45; color: #212121; transition: background 0.15s; }
-      .jai-item:hover { background: #F5F5F5; }
+      .jai-section-title { font-size: 12px; font-weight: 600; color: #A0A0A0; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+      .jai-item { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; padding: 10px 12px; background: #1E1E1E; border: 1px solid #2A2A2A; border-radius: 8px; margin-bottom: 6px; font-size: 14px; line-height: 1.45; color: #E0E0E0; transition: background 0.15s; }
+      .jai-item:hover { background: #252525; }
       .jai-item-text { flex: 1; }
-      .jai-source-dot { position: relative; width: 18px; height: 18px; min-width: 18px; border-radius: 50%; background: rgba(46,125,50,0.12); border: 1px solid rgba(46,125,50,0.3); cursor: default; display: flex; align-items: center; justify-content: center; margin-top: 2px; }
-      .jai-source-dot::after { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #2E7D32; }
-      .jai-source-dot.positive { background: rgba(66,133,244,0.12); border: 1px solid rgba(66,133,244,0.3); }
-      .jai-source-dot.positive::after { background: #4285F4; }
-      .jai-source-dot.negative { background: rgba(219,68,55,0.12); border: 1px solid rgba(219,68,55,0.3); }
-      .jai-source-dot.negative::after { background: #DB4437; }
+      .jai-source-dot { position: relative; width: 18px; height: 18px; min-width: 18px; border-radius: 50%; background: rgba(70,134,236,0.12); border: 1px solid rgba(70,134,236,0.3); cursor: default; display: flex; align-items: center; justify-content: center; margin-top: 2px; }
+      .jai-source-dot::after { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #4686ec; }
+      .jai-source-dot.positive { background: rgba(70,134,236,0.12); border: 1px solid rgba(70,134,236,0.3); }
+      .jai-source-dot.positive::after { background: #4686ec; }
+      .jai-source-dot.negative { background: rgba(239,83,80,0.12); border: 1px solid rgba(239,83,80,0.3); }
+      .jai-source-dot.negative::after { background: #EF5350; }
       .jai-source-dot .jai-popup { top: 50%; transform: translateY(-50%) translateX(4px); right: 100%; margin-right: 8px; max-height: 150px; overflow-y: auto; }
-      .jai-issue { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; background: #FFF3E0; border: 1px solid #FFE0B2; border-radius: 8px; margin-bottom: 6px; font-size: 13px; color: #E65100; line-height: 1.45; }
-      .jai-issue svg { width: 16px; height: 16px; min-width: 16px; color: #E65100; margin-top: 1px; }
-      .jai-consent-btn { width: 100%; padding: 12px 16px; background: #2E7D32; color: #FFFFFF; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.2s ease; margin-bottom: 20px; }
-      .jai-consent-btn:hover { background: #388E3C; }
-      .jai-consent-btn:disabled { background: #CCCCCC; cursor: not-allowed; }
-      .jai-consent-btn.sent { background: #757575; }
-      .jai-placeholder { font-size: 13px; color: #9E9E9E; font-style: italic; padding: 8px 0; }
+      .jai-issue { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; background: #2A2A2A; border: 1px solid #3A3A3A; border-radius: 8px; margin-bottom: 6px; font-size: 13px; color: #FF8A80; line-height: 1.45; }
+      .jai-issue svg { width: 16px; height: 16px; min-width: 16px; color: #FF8A80; margin-top: 1px; }
+      .jai-consent-btn { width: 100%; padding: 12px 16px; background: #4686ec; color: #FFFFFF; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.2s ease; margin-bottom: 20px; }
+      .jai-consent-btn:hover { background: #5A9AFF; }
+      .jai-consent-btn:disabled { background: #2A2A2A; cursor: not-allowed; }
+      .jai-consent-btn.sent { background: #606060; }
+      .jai-placeholder { font-size: 13px; color: #606060; font-style: italic; padding: 8px 0; }
     `;
     document.head.appendChild(style);
   }
@@ -385,7 +385,7 @@
     jitsiToggleBtn.style.cursor = 'pointer';
     jitsiToggleBtn.innerHTML = `
       <div style=\"width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: inherit; overflow: hidden;\">
-        <img src=\"${chrome.runtime.getURL('icon32.png')}\" style=\"width: 100%; height: 100%; object-fit: cover; display: block; border-radius: inherit;\" aria-hidden=\"true\" />
+        <img src=\"${chrome.runtime.getURL('icon64.png')}\" style=\"width: 100%; height: 100%; object-fit: cover; display: block; border-radius: inherit;\" aria-hidden=\"true\" />
       </div>
     `;
     // use namespace toggleSidebar
