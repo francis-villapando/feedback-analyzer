@@ -144,7 +144,7 @@ def classify_with_rules(text: str) -> RuleResult:
     
     # Check nonsensical patterns first (higher priority for spam/junk)
     is_nonsensical, nonsens_confidence, nonsens_reason = check_nonsensical_patterns(text)
-    if is_nonsensical and nonsens_confidence >= 0.8:
+    if is_nonsensical and nonsens_confidence >= 0.7:  # Lowered from 0.8 to catch greetings
         return RuleResult(
             label=ClassificationLabel.NONSENSICAL,
             confidence=nonsens_confidence,

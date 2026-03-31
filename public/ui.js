@@ -8,6 +8,36 @@
   let consentPollSent = false;
   const sidebarId = 'jitsi-ai-sidebar';
 
+  // Add message listener for AI results from content.js
+  window.addEventListener('message', function(event) {
+    if (event.data.type === 'FA_AI_RESULT') {
+      console.log('[FA:UI] Received AI result');
+      displayAIResult(event.data.data);
+    }
+  });
+
+  function displayAIResult(result) {
+    console.log('[FA:UI] Displaying in sidebar');
+    
+    // Update Teaching Strategy Recommendations section - append new strategy (NO PROBLEM, ONLY STRATEGY)
+    const strategyContent = document.getElementById('jai-strategies-content');
+    if (strategyContent) {
+      // Remove placeholder if exists
+      if (strategyContent.querySelector('.jai-placeholder')) {
+        strategyContent.innerHTML = '';
+      }
+      
+      // Only show strategy for pedagogical messages
+      if (result.is_pedagogical && result.strategy) {
+        strategyContent.innerHTML += `
+          <div class="jai-item">
+            <span>${result.strategy}</span>
+          </div>
+        `;
+      }
+    }
+  }
+
   function injectStyles() {
     if (document.getElementById('jitsi-ai-styles')) return;
     const style = document.createElement('style');
@@ -206,11 +236,11 @@
         </button>
         <div class="jai-section">
           <div class="jai-section-title">Feedback Themes</div>
-          ${themesPlaceholder}
+          <div id="jai-themes-content">${themesPlaceholder}</div>
         </div>
         <div class="jai-section">
           <div class="jai-section-title">Teaching Strategy Recommendations</div>
-          ${recommendationsPlaceholder}
+          <div id="jai-strategies-content">${recommendationsPlaceholder}</div>
         </div>
       </div>
     `;

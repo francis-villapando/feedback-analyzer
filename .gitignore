@@ -50,3 +50,6 @@ wheels/
 .coverage
 htmlcov/
 .env
+
+.kilocode/
+plans/

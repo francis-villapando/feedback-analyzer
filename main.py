@@ -108,6 +108,74 @@ async def save_poll_response(response: PollResponse):
     result = supabase.table("poll_responses").insert(data).execute()
     return {"status": "success", "data": result}
 
+# API endpoint to analyze feedback with AI pipeline
+@app.post("/analyze")
+async def analyze_feedback(feedback: Feedback):
+    print(f"[FA:AI] Received message for analysis: {feedback.message[:50]}...")
+    
+    try:
+        # Import AI pipeline
+        import sys
+        import os
+        
+        # Add ai-pipeline to path - use absolute path from project root
+        project_root = os.path.dirname(os.path.abspath(__file__))
+        ai_pipeline_path = os.path.join(project_root, 'ai-pipeline')
+        
+        if ai_pipeline_path not in sys.path:
+            sys.path.insert(0, ai_pipeline_path)
+        
+        # Change to ai-pipeline directory so imports work correctly
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(ai_pipeline_path)
+            from pipelines.run_full_pipeline import run_pipeline
+        finally:
+            os.chdir(original_cwd)
+        
+        print("[FA:AI] Running AI pipeline...")
+        
+        # Run pipeline
+        results = run_pipeline([feedback.message], return_only_pedagogical=False)
+        
+        if not results:
+            print("[FA:AI] No results from pipeline")
+            return {"status": "error", "message": "No results from pipeline"}
+        
+        result = results[0]
+        
+        print(f"[FA:AI] Classification result: {'pedagogical' if result.is_pedagogical else 'nonsensical'}")
+        print(f"[FA:AI] Problem detected: {result.problem}")
+        print(f"[FA:AI] Strategy recommended: {result.primary_strategy}")
+        print(f"[FA:AI] Topic: {result.topic_label}")
+        
+        # Save to Supabase tables - skip if tables don't exist
+        # Just return the results without saving to database for now
+        print("[FA:AI] Analysis complete - returning results")
+        
+        return {
+            "original": result.original_text,
+            "is_pedagogical": result.is_pedagogical,
+            "problem": result.problem,
+            "strategy": result.primary_strategy,
+            "topic": result.topic_label,
+            "errors": result.stage_errors
+        }
+        
+    except Exception as e:
+        print(f"[FA:AI] Error during analysis: {str(e)}")
+        import traceback
+        print(f"[FA:AI] Traceback: {traceback.format_exc()}")
+        return {
+            "status": "error",
+            "message": str(e),
+            "original": feedback.message,
+            "is_pedagogical": False,
+            "problem": None,
+            "strategy": None,
+            "topic": None
+        }
+
 # API endpoint to delete all data for a session
 @app.delete("/sessions/{session_id}")
 async def delete_session_data(session_id: str):

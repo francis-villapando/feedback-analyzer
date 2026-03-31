@@ -179,11 +179,34 @@ def get_strategies_for_problem(problem: str) -> List[str]:
         if key.lower() == problem.lower():
             return strategies
     
-    # Return default strategies if no match
+    # Try partial match - if problem contains part of a key
+    problem_lower = problem.lower()
+    for key, strategies in candidates.items():
+        if problem_lower in key.lower() or key.lower() in problem_lower:
+            return strategies
+    
+    # Map unknown problems to similar known problems for better fallbacks
+    # This ensures different strategies are returned based on problem type
+    problem_fallback_map = {
+        "pace_too_slow": ["Proceed to the next topic", "Offer optional advanced material for faster learners", "Introduce a related side topic", "Provide additional optional exercises"],
+        "pace_too_fast": ["Pause for 30 seconds and ask if anyone has questions", "Repeat the last explanation more slowly", "Allow students to take notes", "Check for understanding"],
+        "difficulty_understanding": ["Break down this explanation into smaller parts", "Rephrase using simpler words", "Use step-by-step approach", "Ask what specific part is unclear"],
+        "misconception": ["Provide a concrete real-world example", "Create a simple diagram", "Address this misconception directly", "Use an analogy"],
+        "need_examples": ["Provide 3 additional worked examples", "Show examples from different contexts", "Create a practice problem", "Share links to online resources"],
+        "technical_difficulty": ["Provide a step-by-step tutorial", "Share a video tutorial", "Offer alternative ways", "Schedule a brief one-on-one session"],
+    }
+    
+    # Check if any fallback matches
+    for key, fallback_strategies in problem_fallback_map.items():
+        if key in problem_lower or problem_lower in key:
+            return fallback_strategies
+    
+    # Ultimate fallback - different options
     return [
         "Check for understanding by asking a question",
         "Provide additional clarification",
-        "Offer to answer any questions"
+        "Offer to answer any questions",
+        "Summarize the key points"
     ]
 
 

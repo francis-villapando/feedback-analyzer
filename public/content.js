@@ -179,6 +179,30 @@ const DatabaseService = {
       session.feedbacks.push(entry);
       fetch('http://localhost:8000/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ session_id: session.id, participant_id: sender, message: text }) })
         .then(res => res.json()).catch(() => {});
+      
+      // NEW: Call AI endpoint for analysis
+      console.log('[FA:AI] Sending to analysis...');
+      fetch('http://localhost:8000/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session_id: session.id,
+          participant_id: sender,
+          message: text
+        })
+      })
+      .then(res => res.json())
+      .then(aiResult => {
+        console.log('[FA:AI] Analysis result:', aiResult);
+        
+        // Send to sidebar via postMessage
+        window.postMessage({
+          type: 'FA_AI_RESULT',
+          data: aiResult
+        }, '*');
+      })
+      .catch(err => console.error('[FA:AI] Error:', err));
+      
       this._save(session, () => { if (callback) callback(session); });
     });
   },
