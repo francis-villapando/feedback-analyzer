@@ -22,10 +22,7 @@ MODELS_DIR = BASE_DIR / "models"
 # Preprocessing Configuration
 PREPROCESSING_CONFIG = {
     "lowercase": True,
-    "remove_punctuation": True,
     "tokenize": True,
-    "remove_stopwords": False,  # KEEP for codeswitching (Tagalog-English)
-    "lemmatize": True,
     "spell_check": True,
 }
 
@@ -69,49 +66,49 @@ ROBERTA_STRATEGY_CONFIG = {
             "Provide a concrete real-world example that illustrates this concept",
             "Create a simple diagram showing how this concept works",
             "Address this misconception directly by explaining why it is incorrect",
-            "Use an analogy that relates to everyday life"
+            "Use an analogy that relates to everyday life",
         ],
         "difficulty_understanding_explanation": [
             "Break down this explanation into 3 smaller parts and explain each separately",
             "Rephrase this concept using simpler words and shorter sentences",
             "Use a step-by-step approach with visual aids",
-            "Ask students what specific part they do not understand"
+            "Ask students what specific part they do not understand",
         ],
         "need_more_examples": [
             "Provide 3 additional worked examples with complete solutions",
             "Show examples from different contexts or applications",
             "Create a practice problem similar to the one just presented",
-            "Share links to online resources with more examples"
+            "Share links to online resources with more examples",
         ],
         "pace_too_fast": [
             "Pause for 30 seconds and ask if anyone has questions",
             "Repeat the last explanation more slowly",
             "Allow students to take notes before continuing",
-            "Check for understanding by asking a quick question"
+            "Check for understanding by asking a quick question",
         ],
         "pace_too_slow": [
             "Proceed to the next topic: [suggest next topic]",
             "Offer optional advanced material for faster learners",
             "Introduce a related side topic that builds on current knowledge",
-            "Provide additional optional exercises for practice"
+            "Provide additional optional exercises for practice",
         ],
         "need_practical_application": [
             "Demonstrate how this concept is used in real-world situations",
             "Show a practical example from everyday life",
             "Connect this to a real problem students might encounter",
-            "Include a hands-on activity or exercise"
+            "Include a hands-on activity or exercise",
         ],
         "unclear_instruction": [
             "Restate the instruction in a different way",
             "Write the instruction on the screen",
             "Provide a checklist of steps to follow",
-            "Give a completed example as reference"
+            "Give a completed example as reference",
         ],
         "technical_difficulty": [
             "Provide a step-by-step tutorial for using the technical tool",
             "Share a video tutorial demonstrating the process",
             "Offer alternative ways to accomplish the same task",
-            "Schedule a brief one-on-one session to help"
+            "Schedule a brief one-on-one session to help",
         ],
     },
 }

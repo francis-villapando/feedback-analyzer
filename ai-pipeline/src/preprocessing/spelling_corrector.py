@@ -10,54 +10,20 @@ from spellchecker import SpellChecker
 
 
 # Custom corrections for common errors in Tagalog-English codeswitching
-# These are corrections that the general spellchecker might miss
+# These are corrections that the general spellchecker might miss or misinterpret.
+# We keep this focused on ACTUAL misspellings, not abbreviations (handled by abbreviation_expander).
 CUSTOM_CORRECTIONS = {
-    # Common Filipino/Tagalog words (often misspelled by English keyboards)
-    'po': 'po',           # polite particle
-    'opo': 'opo',         # yes (polite)
-    'hindi': 'hindi',     # no/not
-    'salamat': 'salamat', # thanks
-    'puwede': 'pwede',    # can/allowed (variation)
-    'pwede': 'pwede',    # can/allowed
-    'magkano': 'magkano', # how much
-    'ilan': 'ilan',       # how many
-    'paano': 'paano',     # how
-    'bakit': 'bakit',     # why
-    'saan': 'saan',       # where
-    'kailan': 'kailan',   # when
-    'naman': 'naman',     # again/now
+    # Variations/Misspellings of Tagalog words
+    'puwede': 'pwede',    
+    'pwed': 'pwede',
+    'mabilis': 'mabilis',
+    'yung': 'yung',
+    'iyong': 'iyong',
+    'nila': 'nila',
+    'kami': 'kami',
+    'tayo': 'tayo',
     
-    # Common chat abbreviations
-    'thx': 'thanks',
-    'thnx': 'thanks',
-    'tnx': 'thanks',
-    'ty': 'thank you',
-    'pls': 'please',
-    'plz': 'please',
-    'bc': 'because',
-    'bcos': 'because',
-    'bcoz': 'because',
-    'wht': 'what',
-    'wat': 'what',
-    'hw': 'how',
-    'hv': 'have',
-    'dnt': "don't",
-    'cnt': "can't",
-    'wnt': "want",
-    'gonna': 'going to',
-    'gotta': 'got to',
-    'wanna': 'want to',
-    'kinda': 'kind of',
-    'sorta': 'sort of',
-    'outta': 'out of',
-    'lemme': 'let me',
-    'gimme': 'give me',
-    'dunno': "don't know",
-    'idk': "I don't know",
-    'imo': 'in my opinion',
-    'imho': 'in my humble opinion',
-    
-    # Common errors
+    # Common English errors
     'teh': 'the',
     'recieve': 'receive',
     'wierd': 'weird',
@@ -81,13 +47,6 @@ CUSTOM_CORRECTIONS = {
     'refered': 'referred',
     'successful': 'successful',
     'tommorow': 'tomorrow',
-    'tue': 'Tuesday',
-    'wed': 'Wednesday',
-    'thu': 'Thursday',
-    'fri': 'Friday',
-    'sat': 'Saturday',
-    'sun': 'Sunday',
-    'mon': 'Monday',
     
     # Numbers in words
     'onee': 'one',
@@ -100,6 +59,18 @@ CUSTOM_CORRECTIONS = {
     'ate': 'eight',
     'nien': 'nine',
     'tenn': 'ten',
+}
+
+# List of common Tagalog/Filipino words to protect from English spell correction
+TAGALOG_WORDS = {
+    'po', 'opo', 'yung', 'sa', 'mabilis', 'mas', 'pa', 'ba', 'ang', 'mga', 
+    'lang', 'talaga', 'kayo', 'siya', 'nila', 'kami', 'tayo', 'ito', 'iyon', 
+    'dito', 'doon', 'na', 'nga', 'din', 'rin', 'naman', 'muna', 'pala',
+    'sana', 'nito', 'niyan', 'niyon', 'ating', 'inyong', 'kanilang',
+    'maging', 'dahil', 'ngunit', 'subalit', 'at', 'o', 'pati', 'saka',
+    'si', 'sina', 'ni', 'nina', 'kay', 'kina', 'laban', 'tungkol',
+    'para', 'hinggil', 'ay', 'naka', 'nakaka', 'nag', 'nagsi', 'mag',
+    'um', 'in', 'ka', 'ma', 'pa', 'pag', 'pan', 'pam'
 }
 
 
@@ -118,6 +89,8 @@ def create_spell_checker(
         SpellChecker instance
     """
     checker = SpellChecker(language=language, distance=distance)
+    # Add Tagalog words to dictionary so they are not "corrected" into English
+    checker.word_frequency.load_words(TAGALOG_WORDS)
     return checker
 
 
@@ -183,7 +156,7 @@ def correct_word(word: str) -> str:
     # Then check spell checker
     checker = get_spell_checker()
     
-    # If word is in dictionary, return as is
+    # If word is in dictionary (including protected Tagalog words), return as is
     if word_lower in checker:
         return word
     
@@ -277,10 +250,8 @@ if __name__ == "__main__":
     test_words = [
         # English errors
         "teh", "recieve", "wierd",
-        # Chat abbreviations
-        "thx", "pls", "idk", "gonna",
-        # Tagalog words
-        "po", "pwede", "salamat",
+        # Should NOT be corrected (already handled by expand_abbreviation or protected)
+        "po", "yung", "mabilis", "sa",
         # Correct words
         "hello", "world", "thanks",
     ]
@@ -298,6 +269,6 @@ if __name__ == "__main__":
     
     # Test full text correction
     print("\nText correction:")
-    test_text = "thx 4 teh help wth teh proejct"
+    test_text = "teh mabilis pa yung sa example"
     corrected = correct_text(test_text)
     print(f"  '{test_text}' -> '{corrected}'")
