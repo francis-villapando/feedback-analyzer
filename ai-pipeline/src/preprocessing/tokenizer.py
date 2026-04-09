@@ -5,6 +5,7 @@ Provides functions to tokenize text into words/tokens.
 Supports both spaCy and NLTK tokenizers.
 """
 
+import re
 from typing import List, Optional
 import nltk
 from nltk.tokenize import word_tokenize
@@ -131,8 +132,7 @@ def detokenize(tokens: List[str]) -> str:
     """
     Convert tokens back to text (detokenization).
     
-    Note: This is a simple implementation and may not handle
-    all edge cases perfectly.
+    Handles punctuation spacing and common contractions.
     
     Args:
         tokens: List of tokens
@@ -144,6 +144,12 @@ def detokenize(tokens: List[str]) -> str:
         return ""
     
     text = " ".join(tokens)
+    
+    # Remove space before common trailing punctuation
+    text = re.sub(r"\s+([.,!?;:%\)\]\}])", r"\1", text)
+    
+    # Remove space after common opening punctuation
+    text = re.sub(r"([\(\[\{])\s+", r"\1", text)
     
     # Handle common contractions
     contractions = {

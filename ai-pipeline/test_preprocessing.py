@@ -12,14 +12,12 @@ from src.preprocessing import preprocess, preprocess_for_model
 # Test with sample messages
 test_messages = [
     'Hello Woooorld!',
-    "oh no, I don't understand po yung example tbh",
+    "I don't understand po yung example. tbh",
     'THANK YOU PO!!!',
-    'Can you explain more clearly?',
     'mas mabilis pa yung sa example',
     'http://example.com is a great resource 😀🤣😌',
     'u r so good n smart, thx!',
-    'hindi ko mantindihan yung example',
-    'hndi aq lng kc gets',
+    'hndi q lng po kc gets yan',
 ]
 
 print('=' * 60)

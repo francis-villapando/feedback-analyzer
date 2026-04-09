@@ -172,6 +172,8 @@ def preprocess(
     # Step 6: Spell correction
     if spell_check:
         tokens = correct_tokens(tokens)
+        # Update cleaned_text after spelling correction/custom mapping
+        result["cleaned_text"] = detokenize(tokens)
 
     result["tokens"] = tokens
 
