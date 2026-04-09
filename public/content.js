@@ -211,6 +211,25 @@ const DatabaseService = {
   getFeedbacks(callback) {
     this._load((session) => { if (!session) { callback([]); return; } callback(session.feedbacks || []); });
   },
+
+  /** Retrieves analysis results for the current session. */
+  getAnalysisCases(callback) {
+    this._load((session) => {
+      if (!session || !session.id) {
+        if (callback) callback([]);
+        return;
+      }
+      fetch(`http://localhost:8000/cases/${session.id}`)
+        .then(res => res.json())
+        .then(data => {
+          if (callback) callback(data);
+        })
+        .catch(err => {
+          console.error('[FA:DB] Failed to fetch cases:', err);
+          if (callback) callback([]);
+        });
+    });
+  },
 };
 
 // Poll processing selectors and logic

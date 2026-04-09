@@ -1,4 +1,5 @@
 (function () {
+  console.log('[FA:UI] Sidebar script loaded');
   window.FA_UI = window.FA_UI || {};
 
   let sidebarVisible = false;
@@ -6,36 +7,217 @@
   let mainContainer = null;
   let jitsiToggleBtn = null;
   let consentPollSent = false;
+  let currentProcessStatus = '';
   const sidebarId = 'jitsi-ai-sidebar';
+
+  const PROCESS_STATUS = {
+    IDLE: 'Waiting for feedback from students...',
+    COLLECTING: 'Collecting feedback from students...',
+    SENDING: 'Sending feedback for analysis...',
+    ANALYZING: 'Analyzing feedback...',
+    COMPLETE: 'Analysis complete'
+  };
 
   // Add message listener for AI results from content.js
   window.addEventListener('message', function(event) {
+    if (event.data.type === 'FA_AI_STATUS') {
+      setProcessStatus(event.data.status);
+    }
     if (event.data.type === 'FA_AI_RESULT') {
-      console.log('[FA:UI] Received AI result');
+      console.log('[FA:UI] AI result received, displaying...');
       displayAIResult(event.data.data);
+    }
+    if (event.data.type === 'FA_AI_COMPLETE') {
+      console.log('[FA:UI] Analysis complete, refreshing cases...');
+      refreshCases();
     }
   });
 
-  function displayAIResult(result) {
-    console.log('[FA:UI] Displaying in sidebar');
+  function refreshCases() {
+    console.log('[FA:UI] refreshCases called');
+    console.log('[FA:UI] DatabaseService available:', typeof window.DatabaseService);
+    if (!window.DatabaseService) {
+      console.warn('[FA:UI] DatabaseService not available');
+      return;
+    }
+    console.log('[FA:UI] Calling getAnalysisCases...');
+    DatabaseService.getAnalysisCases((cases) => {
+      console.log('[FA:UI] Raw cases from callback:', cases);
+      console.log('[FA:UI] Cases type:', typeof cases, Array.isArray(cases));
+      displayCases(cases);
+    });
+  }
+  
+  function displayCases(cases) {
+    console.log('[FA:UI] displayCases called with:', cases);
+    const feedbackContent = document.getElementById('jai-feedback-entries');
+    if (!feedbackContent) return;
     
-    // Update Teaching Strategy Recommendations section - append new strategy (NO PROBLEM, ONLY STRATEGY)
-    const strategyContent = document.getElementById('jai-strategies-content');
-    if (strategyContent) {
-      // Remove placeholder if exists
-      if (strategyContent.querySelector('.jai-placeholder')) {
-        strategyContent.innerHTML = '';
+    if (!cases || cases.length === 0) {
+      feedbackContent.innerHTML = '<div class="jai-placeholder">Waiting for feedback from students...</div>';
+      return;
+    }
+    
+    feedbackContent.innerHTML = '';
+    
+    cases.forEach(c => {
+      console.log('[FA:UI] Processing case:', c);
+      const originalText = c.original_text !== null && c.original_text !== undefined ? c.original_text : 'NULL';
+      const cleanedText = c.cleaned_text !== null && c.cleaned_text !== undefined ? c.cleaned_text : 'NULL';
+      const tokens = (c.tokens !== null && c.tokens !== undefined && Array.isArray(c.tokens)) ? c.tokens.join(', ') : 'NULL';
+      
+      const isPedagogical = c.is_pedagogical;
+      let classificationLabel, classificationClass;
+      if (isPedagogical === true) {
+        classificationLabel = 'Pedagogical';
+        classificationClass = 'pedagogical';
+      } else if (isPedagogical === false) {
+        classificationLabel = 'Non-Pedagogical';
+        classificationClass = 'non-pedagogical';
+      } else {
+        classificationLabel = 'NULL';
+        classificationClass = 'pending';
       }
       
-      // Only show strategy for pedagogical messages
-      if (result.is_pedagogical && result.strategy) {
-        strategyContent.innerHTML += `
-          <div class="jai-item">
-            <span>${result.strategy}</span>
-          </div>
-        `;
+      const confidence = (c.classification_confidence !== undefined && c.classification_confidence !== null) 
+        ? (c.classification_confidence * 100).toFixed(0) + '%' 
+        : 'NULL';
+      
+      const aspect = (c.aspect !== null && c.aspect !== undefined) ? c.aspect : 'NULL';
+      const issue = (c.issue !== null && c.issue !== undefined && c.issue !== '') ? c.issue : 'NULL';
+      const polarity = (c.polarity !== null && c.polarity !== undefined) ? c.polarity : 'NULL';
+      const bloomLevel = (c.bloom_taxonomy !== null && c.bloom_taxonomy !== undefined) ? c.bloom_taxonomy : 'NULL';
+      const cognitiveLoad = (c.cognitive_load !== null && c.cognitive_load !== undefined) ? c.cognitive_load : 'NULL';
+      const strategy = (c.strategy !== null && c.strategy !== undefined && c.strategy !== '') ? c.strategy : 'NULL';
+      
+      const entry = document.createElement('div');
+      entry.className = 'jai-feedback-card';
+      entry.innerHTML = `
+        <table class="jai-table">
+          <tr class="jai-table-section"><td colspan="2" class="jai-table-section-title">Feedback</td></tr>
+          <tr><td class="jai-table-label">Original</td><td class="jai-table-value">${escapeHtml(originalText)}</td></tr>
+          <tr><td class="jai-table-label">Cleaned</td><td class="jai-table-value">${escapeHtml(cleanedText)}</td></tr>
+          <tr><td class="jai-table-label">Tokens</td><td class="jai-table-value jai-table-tokens">${escapeHtml(tokens)}</td></tr>
+          <tr class="jai-table-section"><td colspan="2" class="jai-table-section-title">Classification</td></tr>
+          <tr><td class="jai-table-label">Type</td><td class="jai-table-value ${classificationClass}">${classificationLabel}</td></tr>
+          <tr><td class="jai-table-label">Confidence</td><td class="jai-table-value">${confidence}</td></tr>
+          <tr class="jai-table-section"><td colspan="2" class="jai-table-section-title">Extracted Information</td></tr>
+          <tr><td class="jai-table-label">Aspect</td><td class="jai-table-value">${escapeHtml(aspect)}</td></tr>
+          <tr><td class="jai-table-label">Issue</td><td class="jai-table-value">${escapeHtml(issue)}</td></tr>
+          <tr><td class="jai-table-label">Polarity</td><td class="jai-table-value">${escapeHtml(polarity)}</td></tr>
+          <tr class="jai-table-section"><td colspan="2" class="jai-table-section-title">Cognitive Interpretation</td></tr>
+          <tr><td class="jai-table-label">Bloom's Taxonomy</td><td class="jai-table-value">${escapeHtml(bloomLevel)}</td></tr>
+          <tr><td class="jai-table-label">Cognitive Load</td><td class="jai-table-value">${escapeHtml(cognitiveLoad)}</td></tr>
+          <tr class="jai-table-section"><td colspan="2" class="jai-table-section-title">Teaching Strategy</td></tr>
+          <tr><td colspan="2" class="jai-table-strategy">${escapeHtml(strategy)}</td></tr>
+        </table>
+      `;
+      
+      feedbackContent.appendChild(entry);
+    });
+  }
+
+  function setProcessStatus(status) {
+    currentProcessStatus = status || PROCESS_STATUS.IDLE;
+    const statusEl = document.getElementById('jai-process-status');
+    if (statusEl) {
+      statusEl.textContent = currentProcessStatus;
+      statusEl.classList.remove('idle', 'processing', 'complete');
+      if (currentProcessStatus === PROCESS_STATUS.IDLE) {
+        statusEl.classList.add('idle');
+      } else if (currentProcessStatus === PROCESS_STATUS.COMPLETE) {
+        statusEl.classList.add('complete');
+      } else {
+        statusEl.classList.add('processing');
       }
     }
+  }
+  
+  function displayAIResult(result) {
+    console.log('[FA:UI] Displaying in sidebar', result);
+    
+    setProcessStatus(PROCESS_STATUS.COMPLETE);
+    
+    const feedbackContent = document.getElementById('jai-feedback-entries');
+    if (!feedbackContent) return;
+    
+    // Remove placeholder if exists
+    const placeholder = feedbackContent.querySelector('.jai-placeholder');
+    if (placeholder) {
+      placeholder.remove();
+    }
+    
+    // Handle both single result and array of results
+    const results = Array.isArray(result) ? result : [result];
+    console.log('[FA:UI] Processing', results.length, 'results');
+    
+    results.forEach(r => {
+      // Field names from server (main.py lines 159-167)
+      // Returns: original, cleaned_text, tokens, is_pedagogical, classification_confidence, problem, strategy, topic, errors
+      const originalText = r.original || r.original_text || r.originalText || 'NULL';
+      const cleanedText = r.cleaned_text || r.cleanedText || 'NULL';
+      const tokens = r.tokens || [];
+      const tokensDisplay = (tokens && tokens.length > 0) ? tokens.join(', ') : 'NULL';
+      
+      // Classification - check actual boolean value
+      const isPedagogical = r.is_pedagogical;
+      const classificationConf = r.classification_confidence;
+      
+      // Determine classification: only show actual status if it's a boolean (true/false), not undefined/null
+      let classificationLabel, classificationClass;
+      if (isPedagogical === true) {
+        classificationLabel = 'Pedagogical';
+        classificationClass = 'pedagogical';
+      } else if (isPedagogical === false) {
+        classificationLabel = 'Non-Pedagogical';
+        classificationClass = 'non-pedagogical';
+      } else {
+        classificationLabel = 'NULL';
+        classificationClass = 'pending';
+      }
+      
+      const confidence = (classificationConf !== undefined && classificationConf !== null) 
+        ? (classificationConf * 100).toFixed(0) + '%' 
+        : 'NULL';
+      
+      const aspect = r.aspect || 'NULL';
+      const issue = r.problem || 'NULL';
+      const polarity = r.polarity || 'NULL';
+      const bloomLevel = r.bloom_level || r.bloom || 'NULL';
+      const cognitiveLoad = r.cognitive_load || r.cognitiveLoad || 'NULL';
+      const strategy = r.strategy || r.primary_strategy || 'NULL';
+      
+      const entry = document.createElement('div');
+      entry.className = 'jai-feedback-card';
+      entry.innerHTML = `
+        <table class="jai-table">
+          <tr class="jai-table-section"><td colspan="2" class="jai-table-section-title">Feedback</td></tr>
+          <tr><td class="jai-table-label">Original</td><td class="jai-table-value">${escapeHtml(originalText)}</td></tr>
+          <tr><td class="jai-table-label">Cleaned</td><td class="jai-table-value">${escapeHtml(cleanedText)}</td></tr>
+          <tr><td class="jai-table-label">Tokens</td><td class="jai-table-value jai-table-tokens">${escapeHtml(tokensDisplay)}</td></tr>
+          <tr class="jai-table-section"><td colspan="2" class="jai-table-section-title">Classification</td></tr>
+          <tr><td class="jai-table-label">Type</td><td class="jai-table-value ${classificationClass}">${classificationLabel}</td></tr>
+          <tr><td class="jai-table-label">Confidence</td><td class="jai-table-value">${confidence}</td></tr>
+          <tr class="jai-table-section"><td colspan="2" class="jai-table-section-title">Extracted Information</td></tr>
+          <tr><td class="jai-table-label">Aspect</td><td class="jai-table-value">${escapeHtml(aspect)}</td></tr>
+          <tr><td class="jai-table-label">Issue</td><td class="jai-table-value">${escapeHtml(issue)}</td></tr>
+          <tr><td class="jai-table-label">Polarity</td><td class="jai-table-value">${escapeHtml(polarity)}</td></tr>
+          <tr class="jai-table-section"><td colspan="2" class="jai-table-section-title">Cognitive Interpretation</td></tr>
+          <tr><td class="jai-table-label">Bloom's Taxonomy</td><td class="jai-table-value">${escapeHtml(bloomLevel)}</td></tr>
+          <tr><td class="jai-table-label">Cognitive Load</td><td class="jai-table-value">${escapeHtml(cognitiveLoad)}</td></tr>
+          <tr class="jai-table-section"><td colspan="2" class="jai-table-section-title">Teaching Strategy</td></tr>
+          <tr><td colspan="2" class="jai-table-strategy">${escapeHtml(strategy)}</td></tr>
+        </table>
+      `;
+      
+      feedbackContent.appendChild(entry);
+    });
+  }
+  
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   }
 
   function injectStyles() {
@@ -65,7 +247,7 @@
       .jai-header-title { font-size: 18px; font-weight: 600; color: #4686ec; }
       .jai-close-btn { width: 28px; height: 28px; border: none; background: #1E1E1E; border-radius: 50%; cursor: pointer; font-size: 16px; color: #A0A0A0; display: flex; align-items: center; justify-content: center; transition: background 0.15s; }
       .jai-close-btn:hover { background: #252525; }
-      .jai-content { flex: 1; overflow-y: auto; padding: 20px; }
+      .jai-content { flex: 1; overflow-y: auto; padding: 20px; padding-bottom: 70px; }
       .jai-content::-webkit-scrollbar { width: 4px; }
       .jai-content::-webkit-scrollbar-thumb { background: #2A2A2A; border-radius: 2px; }
       .jai-counts { display: flex; gap: 12px; margin-bottom: 20px; }
@@ -98,6 +280,33 @@
       .jai-consent-btn:disabled { background: #2A2A2A; cursor: not-allowed; }
       .jai-consent-btn.sent { background: #606060; }
       .jai-placeholder { font-size: 13px; color: #606060; font-style: italic; padding: 8px 0; }
+      .jai-feedback-cards { display: flex; flex-direction: column; gap: 12px; }
+      .jai-feedback-card { background: #1E1E1E; border: 1px solid #2A2A2A; border-radius: 8px; overflow: hidden; }
+      .jai-card-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #252525; border-bottom: 1px solid #2A2A2A; }
+      .jai-card-label { font-size: 12px; font-weight: 600; padding: 4px 8px; border-radius: 4px; text-transform: uppercase; }
+      .jai-card-label.pedagogical { background: rgba(70,134,236,0.2); color: #4686ec; }
+      .jai-card-label.non-pedagogical { background: rgba(239,83,80,0.2); color: #EF5350; }
+      .jai-card-confidence { font-size: 12px; color: #A0A0A0; }
+      .jai-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+      .jai-table-section { background: #252525; }
+      .jai-table-section-title { padding: 6px 10px; font-size: 10px; font-weight: 600; color: #4686ec; text-transform: uppercase; letter-spacing: 0.5px; }
+      .jai-table td { padding: 8px 10px; border-bottom: 1px solid #2A2A2A; vertical-align: top; }
+      .jai-table tr:last-child td { border-bottom: none; }
+      .jai-table-label { font-weight: 600; color: #A0A0A0; width: 90px; font-size: 11px; text-transform: uppercase; }
+      .jai-table-value { color: #E0E0E0; word-break: break-word; }
+      .jai-table-value.pedagogical { color: #4686ec; }
+      .jai-table-value.non-pedagogical { color: #EF5350; }
+      .jai-table-value.pending { color: #606060; font-style: italic; }
+      .jai-table-tokens { font-family: monospace; font-size: 11px; color: #B0B0B0; }
+      .jai-table-strategy { color: #4686ec; font-weight: 500; }
+      .jai-bottom-bar { position: absolute; bottom: 0; left: 0; right: 0; padding: 12px 16px; background: #1E1E1E; border-top: 1px solid #2A2A2A; font-size: 12px; display: flex; flex-direction: column; gap: 6px; }
+      .jai-process-status { color: #A0A0A0; font-style: italic; display: flex; align-items: center; gap: 6px; }
+      .jai-process-status::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #606060; flex-shrink: 0; }
+      .jai-process-status.idle::before { background: #606060; }
+      .jai-process-status.processing::before { background: #4686ec; animation: jai-pulse 1s infinite; }
+      .jai-process-status.complete::before { background: #4CAF50; }
+      @keyframes jai-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+      .jai-ai-disclaimer { color: #606060; font-size: 10px; font-style: italic; }
     `;
     document.head.appendChild(style);
   }
@@ -210,8 +419,7 @@
     sidebar = document.createElement('div');
     sidebar.id = sidebarId;
 
-    const themesPlaceholder = `<div class="jai-placeholder">Themes will appear here once AI analysis is connected.</div>`;
-    const recommendationsPlaceholder = `<div class="jai-placeholder">Recommendations will appear here once AI analysis is connected.</div>`;
+    const feedbackEntriesPlaceholder = `<div class="jai-placeholder">Waiting for feedback from students...</div>`;
 
     sidebar.innerHTML = `
       <div class="jai-header">
@@ -235,13 +443,13 @@
           ${consentPollSent ? 'Consent Poll Sent' : 'Send Consent Notice'}
         </button>
         <div class="jai-section">
-          <div class="jai-section-title">Feedback Themes</div>
-          <div id="jai-themes-content">${themesPlaceholder}</div>
+          <div class="jai-section-title">Feedback Analysis</div>
+          <div id="jai-feedback-entries" class="jai-feedback-cards">${feedbackEntriesPlaceholder}</div>
         </div>
-        <div class="jai-section">
-          <div class="jai-section-title">Teaching Strategy Recommendations</div>
-          <div id="jai-strategies-content">${recommendationsPlaceholder}</div>
-        </div>
+      </div>
+      <div class="jai-bottom-bar">
+        <div id="jai-process-status" class="jai-process-status idle">${PROCESS_STATUS.IDLE}</div>
+        <div class="jai-ai-disclaimer">AI can make mistakes. Please verify important information.</div>
       </div>
     `;
 
@@ -249,6 +457,7 @@
     sidebarVisible = true;
     refreshParticipantsBadge();
     refreshFeedbacksBadge();
+    refreshCases();
     setupPopupHover();
 
     if (window.DatabaseService && typeof DatabaseService.getSession === 'function') {
@@ -315,7 +524,7 @@
             const sendButton = document.querySelector('button[aria-label="Send poll"]');
             if (sendButton) {
               sendButton.click();
-              console.log('[FA] Consent poll broadcasted');
+              console.log('[FA:UI] Consent poll broadcasted');
             }
             setTimeout(() => {
               const skipButton = document.querySelector('button[aria-label="Skip"]') ||
@@ -375,24 +584,46 @@
   }
 
   function injectJitsiToggleButton() {
-    const toolbar = document.querySelector('.toolbox-content-items');
-    if (!toolbar || jitsiToggleBtn) return;
-    jitsiToggleBtn = document.createElement('div');
-    jitsiToggleBtn.className = 'toolbox-button';
-    jitsiToggleBtn.setAttribute('role', 'button');
-    jitsiToggleBtn.setAttribute('tabindex', '0');
-    jitsiToggleBtn.setAttribute('aria-disabled', 'false');
-    jitsiToggleBtn.style.cursor = 'pointer';
-    jitsiToggleBtn.innerHTML = `
-      <div style=\"width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: inherit; overflow: hidden;\">
-        <img src=\"${chrome.runtime.getURL('icon64.png')}\" style=\"width: 100%; height: 100%; object-fit: cover; display: block; border-radius: inherit;\" aria-hidden=\"true\" />
-      </div>
-    `;
-    // use namespace toggleSidebar
-    jitsiToggleBtn.addEventListener('click', () => { if (window.FA_UI && window.FA_UI.toggleSidebar) window.FA_UI.toggleSidebar(); });
-    jitsiToggleBtn.addEventListener('mouseenter', () => { jitsiToggleBtn.style.background = 'rgba(0,0,0,0.1)'; });
-    jitsiToggleBtn.addEventListener('mouseleave', () => { jitsiToggleBtn.style.background = ''; });
-    toolbar.appendChild(jitsiToggleBtn);
+    console.log('[FA:UI] injectJitsiToggleButton called');
+    console.log('[FA:UI] window.FA_UI:', typeof window.FA_UI);
+    console.log('[FA:UI] window.FA_UI.injectJitsiToggleButton:', typeof window.FA_UI?.injectJitsiToggleButton);
+    
+    function tryInject() {
+      const toolbar = document.querySelector('.toolbox-content-items');
+      console.log('[FA:UI] Toolbar found:', !!toolbar);
+      console.log('[FA:UI] jitsiToggleBtn already exists:', !!jitsiToggleBtn);
+      
+      if (!toolbar) {
+        console.log('[FA:UI] Toolbar not ready, retrying in 500ms...');
+        setTimeout(tryInject, 500);
+        return;
+      }
+      
+      if (jitsiToggleBtn) {
+        console.log('[FA:UI] Button already exists, skipping');
+        return;
+      }
+      
+      jitsiToggleBtn = document.createElement('div');
+      jitsiToggleBtn.className = 'toolbox-button';
+      jitsiToggleBtn.setAttribute('role', 'button');
+      jitsiToggleBtn.setAttribute('tabindex', '0');
+      jitsiToggleBtn.setAttribute('aria-disabled', 'false');
+      jitsiToggleBtn.style.cursor = 'pointer';
+      jitsiToggleBtn.innerHTML = `
+        <div style=\"width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: inherit; overflow: hidden;\">
+          <img src=\"${chrome.runtime.getURL('icon64.png')}\" style=\"width: 100%; height: 100%; object-fit: cover; display: block; border-radius: inherit;\" aria-hidden=\"true\" />
+        </div>
+      `;
+      // use namespace toggleSidebar
+      jitsiToggleBtn.addEventListener('click', () => { if (window.FA_UI && window.FA_UI.toggleSidebar) window.FA_UI.toggleSidebar(); });
+      jitsiToggleBtn.addEventListener('mouseenter', () => { jitsiToggleBtn.style.background = 'rgba(0,0,0,0.1)'; });
+      jitsiToggleBtn.addEventListener('mouseleave', () => { jitsiToggleBtn.style.background = ''; });
+      toolbar.appendChild(jitsiToggleBtn);
+      console.log('[FA:UI] Button injected successfully');
+    }
+    
+    tryInject();
   }
 
   function removeJitsiToggleButton() {
@@ -419,10 +650,16 @@
   window.FA_UI.toggleSidebar = toggleSidebar;
   window.FA_UI.refreshParticipantsBadge = refreshParticipantsBadge;
   window.FA_UI.refreshFeedbacksBadge = refreshFeedbacksBadge;
+  window.FA_UI.refreshCases = refreshCases;
   window.FA_UI.updateConsentButton = updateConsentButton;
   window.FA_UI.popupList = popupList;
   window.FA_UI.getThemeType = getThemeType;
   window.FA_UI.setupPopupHover = setupPopupHover;
   window.FA_UI.setConsentSent = setConsentSent;
+  window.FA_UI.setProcessStatus = setProcessStatus;
+  window.FA_UI.PROCESS_STATUS = PROCESS_STATUS;
+
+  console.log('[FA:UI] All functions exposed to window.FA_UI');
+  console.log('[FA:UI] window.FA_UI.injectJitsiToggleButton:', typeof window.FA_UI.injectJitsiToggleButton);
 
 })();

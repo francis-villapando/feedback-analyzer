@@ -151,6 +151,9 @@ async function populateCourses() {
     courseSelect.innerHTML = '<option value="">Select a course...</option>';
     
     for (const course of courses) {
+      // Store in courseTopics map for lookup by ID
+      courseTopics[course.id] = course;
+      
       const option = document.createElement('option');
       option.value = course.id;
       option.textContent = course.name;

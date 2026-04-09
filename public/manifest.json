@@ -13,7 +13,8 @@
     "storage"
   ],
   "host_permissions": [
-    "https://meet.jit.si/*"
+    "https://meet.jit.si/*",
+    "http://localhost:8000/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -39,8 +40,8 @@
         "https://meet.jit.si/*"
       ],
       "js": [
-        "content.js",
-        "ui.js"
+        "sidebar.js",
+        "content.js"
       ],
       "css": [
         "popup.css"
