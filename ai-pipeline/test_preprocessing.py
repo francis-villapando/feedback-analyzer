@@ -18,6 +18,8 @@ test_messages = [
     'mas mabilis pa yung sa example',
     'http://example.com is a great resource 😀🤣😌',
     'u r so good n smart, thx!',
+    'hindi ko mantindihan yung example',
+    'hndi aq lng kc gets',
 ]
 
 print('=' * 60)

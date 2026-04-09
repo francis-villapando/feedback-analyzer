@@ -42,7 +42,7 @@ def normalize_elongation(text: str, reduce_to: int = 1) -> str:
 
 def normalize_vowels(text: str) -> str:
     """
-    Normalize vowels in text - convert to lowercase and reduce elongation.
+    Normalize vowels in text - reduce elongation.
 
     This handles informal text with stretched words like:
     - "hellooooo" -> "hello"
