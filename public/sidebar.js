@@ -61,27 +61,25 @@
     feedbackContent.innerHTML = '';
 
     cases.forEach(c => {
-      console.log('[FA:UI] Processing case:', c);
-      const cleanedText = c.cleaned_text ?? '';
-      const aspect = c.aspect ?? '-';
-      const issue = c.issue ?? '-';
-      const bloomLevel = c.bloom_taxonomy ?? '-';
-      const cognitiveLoad = c.cognitive_load ?? '-';
-      const strategy = c.strategy ?? '-';
+      const originalText = c.original_text || 'No feedback available';
+      const cleanedText = c.cleaned_text !== null && c.cleaned_text !== undefined ? c.cleaned_text : '-';
+      const aspect = (c.aspect || '-');
+      const issue = (c.issue || '-');
+      const bloomLevel = c.bloom_taxonomy || '-';
+      const cognitiveLoad = c.cognitive_load || '-';
+
+      const strategy = c.strategy || '-';
 
       const entry = document.createElement('div');
       entry.className = 'jai-feedback-card';
 
-      // Explicitly honor the cleaned_text if it's provided by the backend (even if it's an empty string), only falling back on null/undefined
-      const finalCleanedText = c.cleaned_text !== null && c.cleaned_text !== undefined ? c.cleaned_text : (c.original_text || 'No feedback available');
-
       // Always display badges for Bloom and Cognitive Load, even if '-'
-      const bloomBadge = `<span class="jai-badge" title="Bloom's Taxonomy">${escapeHtml(bloomLevel)}</span>`;
-      const loadBadge = `<span class="jai-badge" title="Cognitive Load">${escapeHtml(cognitiveLoad)}</span>`;
+      const bloomBadge = `<span class="jai-badge" title="Difficulty Type">Difficulty Type: ${escapeHtml(bloomLevel)}</span>`;
+      const loadBadge = `<span class="jai-badge" title="Cause">Cause: ${escapeHtml(cognitiveLoad)}</span>`;
 
       entry.innerHTML = `
         <div class="jai-card-primary">
-          <div class="jai-card-quote">"${escapeHtml(finalCleanedText)}"</div>
+          <div class="jai-card-quote">"${escapeHtml(cleanedText !== '-' ? cleanedText : originalText)}"</div>
         </div>
         <table class="jai-table">
           <tr>
@@ -141,28 +139,26 @@
     console.log('[FA:UI] Processing', results.length, 'results');
 
     results.forEach(r => {
-      // Field names from server (main.py lines 159-167)
-      // Returns: original, cleaned_text, tokens, is_pedagogical, classification_confidence, problem, strategy, topic, errors
-      const cleanedText = r.cleaned_text ?? '';
-      const aspect = r.aspect ?? '-';
-      const issue = r.problem ?? '-';
-      const bloomLevel = r.bloom_level ?? r.bloom ?? '-';
+      // Mapping from server response: original, cleaned_text, tokens, problem (issue), strategy, topic (aspect)
+      const originalText = r.original || r.original_text || 'No feedback available';
+      const cleanedText = r.cleaned_text || '-';
+      const aspect = r.topic || r.topic_label || r.aspect || '-';
+      const issue = r.problem || r.issue || '-';
+      const bloomLevel = r.bloom_level ?? r.bloom_taxonomy ?? r.bloom ?? '-';
       const cognitiveLoad = r.cognitive_load ?? r.cognitiveLoad ?? '-';
-      const strategy = r.strategy ?? r.primary_strategy ?? '-';
+
+      const strategy = r.strategy || r.primary_strategy || '-';
 
       const entry = document.createElement('div');
       entry.className = 'jai-feedback-card';
 
-      // Explicitly honor the cleaned_text if it's provided by the backend (even if it's an empty string), only falling back on null/undefined
-      const finalCleanedText = r.cleaned_text !== null && r.cleaned_text !== undefined ? r.cleaned_text : (r.original || r.original_text || r.originalText || 'No feedback available');
-
       // Always display badges for Bloom and Cognitive Load, even if '-'
-      const bloomBadge = `<span class="jai-badge" title="Bloom's Taxonomy">Bloom's: ${escapeHtml(bloomLevel)}</span>`;
-      const loadBadge = `<span class="jai-badge" title="Cognitive Load">Load: ${escapeHtml(cognitiveLoad)}</span>`;
+      const bloomBadge = `<span class="jai-badge" title="Difficulty Type">Difficulty Type: ${escapeHtml(bloomLevel)}</span>`;
+      const loadBadge = `<span class="jai-badge" title="Cause">Cause: ${escapeHtml(cognitiveLoad)}</span>`;
 
       entry.innerHTML = `
         <div class="jai-card-primary">
-          <div class="jai-card-quote">"${escapeHtml(finalCleanedText)}"</div>
+          <div class="jai-card-quote">"${escapeHtml(cleanedText !== '-' ? cleanedText : originalText)}"</div>
         </div>
         <table class="jai-table">
           <tr>

@@ -12,7 +12,7 @@ from src.preprocessing import preprocess, preprocess_for_model
 # Test with sample messages
 test_messages = [
     'Hello Woooorld!',
-    "I don't understand po yung example. tbh",
+    "I don't understand po yung example, tbh",
     'THANK YOU PO!!!',
     'mas mabilis pa yung sa example',
     'http://example.com is a great resource 😀🤣😌',

@@ -268,6 +268,8 @@ async def analyze_feedback(feedback: Feedback):
             "problem": result.problem,
             "strategy": result.primary_strategy,
             "topic": result.topic_label,
+            "bloom_taxonomy": None,
+            "cognitive_load": None,
             "case_id": saved_id,
             "db_error": db_error,
             "errors": result.stage_errors,
