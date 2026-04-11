@@ -11,14 +11,11 @@ from dotenv import load_dotenv
 load_dotenv()
 load_dotenv(os.path.join("ai-pipeline", ".env"))
 
-SUPABASE_URL = os.getenv("SUPABASE_URL", "")
-SUPABASE_KEY = os.getenv("SUPABASE_ANON_KEY", "")
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_ANON_KEY")
 
 if not SUPABASE_URL or not SUPABASE_KEY:
-    # Fallback to hardcoded for now if not set, but warn
-    print("WARNING: SUPABASE_URL or SUPABASE_ANON_KEY not found in environment. Using fallbacks.")
-    SUPABASE_URL = "https://iapkqaaiifkazxdyftpz.supabase.co"
-    SUPABASE_KEY = "sb_publishable_G49_FQHkfrEtQfQ6cT5b5g_L5ErfkBF"
+    raise ValueError("SUPABASE_URL and SUPABASE_ANON_KEY must be set in environment variables")
 
 app = FastAPI()
 
@@ -26,12 +23,12 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=False,  # Set to False because wildcard origins are not compatible with credentials
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-supabase: Client = create_client("https://iapkqaaiifkazxdyftpz.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhcGtxYWFpaWZrYXp4ZHlmdHB6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0MzUyNzEsImV4cCI6MjA4OTAxMTI3MX0.z6_cuXyUaYN_3b-JwcbzyLpQbJE697KUTE4zVZMoUnI");
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
 # Data models
