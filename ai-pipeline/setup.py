@@ -19,10 +19,7 @@ setup(
         "spacy>=3.6.0",
         "nltk>=3.8.0",
         "pyspellchecker>=0.7.0",
-        "bertopic>=0.15.0",
-        "sentence-transformers>=2.2.0",
-        "umap-learn>=0.5.3",
-        "hdbscan>=0.8.29",
+        # Topic-modeling heavy dependencies removed; MCP-backed services used instead
         "accelerate>=0.20.0",
         "supabase>=2.0.0",
         "python-dotenv>=1.0.0",

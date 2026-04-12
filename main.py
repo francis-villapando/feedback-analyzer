@@ -219,14 +219,15 @@ async def analyze_feedback(feedback: Feedback):
             "original_text": result.original_text,
             "cleaned_text": result.cleaned_text,
             "tokens": result.tokens,
-            "is_pedagogical": None,
-            "classification_confidence": None,
+            "is_pedagogical": result.is_pedagogical,
+            "classification_confidence": float(result.classification_confidence or 0.0),
+            # ABSA fields: aspect/issue/polarity. Aspect detection is optional for now.
             "aspect": None,
-            "issue": None,
-            "polarity": None,
+            "issue": result.problem,
+            "polarity": ("negative" if result.problem_confidence and result.problem_confidence > 0.5 else ("neutral" if result.problem_confidence else None)),
             "bloom_taxonomy": None,
             "cognitive_load": None,
-            "strategy": None,
+            "strategy": result.primary_strategy,
         }
 
         print(f"[FA:DB] Attempting to insert case_data: {case_data}")

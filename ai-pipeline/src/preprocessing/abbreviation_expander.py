@@ -23,7 +23,7 @@ ABBREVIATIONS = {
     "tnx": "thanks",
     "tysm": "thank you so much",
     "np": "no problem",
-    "no prob": "no problem",
+    "prob": "problem",
     "sry": "sorry",
     "srry": "sorry",
     "srsly": "seriously",

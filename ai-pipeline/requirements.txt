@@ -15,10 +15,11 @@ huggingface-hub>=0.19.0
 pyxdameraulevenshtein>=1.7.0
 
 # Topic Modeling
-bertopic>=0.15.0
-sentence-transformers>=2.2.0
-umap-learn>=0.5.3
-hdbscan>=0.8.29
+# Topic modeling deprecated: heavy local deps were removed in favor of MCP-backed ABSA
+# (bertopic, sentence-transformers, umap-learn, hdbscan removed)
+
+# HTTP client for MCP
+requests>=2.28.0
 
 # Classification (BERT/RoBERTa)
 accelerate>=0.20.0

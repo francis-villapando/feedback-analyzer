@@ -25,92 +25,17 @@ PREPROCESSING_CONFIG = {
     "tokenize": True,
     "spell_check": True,
 }
+# NOTE: Old local-model configurations (BERT, BERTopic, RoBERTa) have been
+# deprecated in favor of an external MCP-backed model server. Keep these
+# entries removed to avoid accidental usage of local models.
 
-# BERT Classification Configuration
-BERT_CONFIG = {
-    "model_name": "bert-base-uncased",
-    "max_length": 128,
-    "batch_size": 16,
-    "use_rule_based_first": True,  # Apply rules before BERT
-}
-
-# BERTopic Configuration
-BERTOPIC_CONFIG = {
-    "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
-    "nr_topics": "auto",
-    "min_topic_size": 5,
-    "verbose": True,
-}
-
-# RoBERTa Problem Detection Configuration
-ROBERTA_PROBLEM_CONFIG = {
-    "model_name": "roberta-base",
-    "max_length": 128,
-    "problem_categories": [
-        "misconception_about_concept",
-        "difficulty_understanding_explanation",
-        "need_more_examples",
-        "pace_too_fast",
-        "pace_too_slow",
-        "need_practical_application",
-        "unclear_instruction",
-        "technical_difficulty",
-    ],
-}
-
-# RoBERTa Strategy Mapping Configuration
-ROBERTA_STRATEGY_CONFIG = {
-    "model_name": "roberta-base",
-    "strategy_mappings": {
-        "misconception_about_concept": [
-            "Provide a concrete real-world example that illustrates this concept",
-            "Create a simple diagram showing how this concept works",
-            "Address this misconception directly by explaining why it is incorrect",
-            "Use an analogy that relates to everyday life",
-        ],
-        "difficulty_understanding_explanation": [
-            "Break down this explanation into 3 smaller parts and explain each separately",
-            "Rephrase this concept using simpler words and shorter sentences",
-            "Use a step-by-step approach with visual aids",
-            "Ask students what specific part they do not understand",
-        ],
-        "need_more_examples": [
-            "Provide 3 additional worked examples with complete solutions",
-            "Show examples from different contexts or applications",
-            "Create a practice problem similar to the one just presented",
-            "Share links to online resources with more examples",
-        ],
-        "pace_too_fast": [
-            "Pause for 30 seconds and ask if anyone has questions",
-            "Repeat the last explanation more slowly",
-            "Allow students to take notes before continuing",
-            "Check for understanding by asking a quick question",
-        ],
-        "pace_too_slow": [
-            "Proceed to the next topic: [suggest next topic]",
-            "Offer optional advanced material for faster learners",
-            "Introduce a related side topic that builds on current knowledge",
-            "Provide additional optional exercises for practice",
-        ],
-        "need_practical_application": [
-            "Demonstrate how this concept is used in real-world situations",
-            "Show a practical example from everyday life",
-            "Connect this to a real problem students might encounter",
-            "Include a hands-on activity or exercise",
-        ],
-        "unclear_instruction": [
-            "Restate the instruction in a different way",
-            "Write the instruction on the screen",
-            "Provide a checklist of steps to follow",
-            "Give a completed example as reference",
-        ],
-        "technical_difficulty": [
-            "Provide a step-by-step tutorial for using the technical tool",
-            "Share a video tutorial demonstrating the process",
-            "Offer alternative ways to accomplish the same task",
-            "Schedule a brief one-on-one session to help",
-        ],
-    },
+# MCP (Model Context Protocol) Configuration - points to the external model
+# server (e.g., a Hugging Face Spaces or other MCP server) that exposes
+# classification, ABSA, and strategy endpoints.
+MCP_CONFIG = {
+    "server_url": os.getenv("MCP_SERVER_URL", ""),
+    "api_key": os.getenv("MCP_API_KEY", ""),
+    "timeout_seconds": int(os.getenv("MCP_TIMEOUT_SECONDS", "10")),
 }
 
 # Supabase Configuration

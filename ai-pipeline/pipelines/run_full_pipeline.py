@@ -1,21 +1,34 @@
 """
 Full Pipeline Orchestration
 
-This module orchestrates the complete AI pipeline:
+This module orchestrates the complete AI pipeline using MCP-backed services:
 1. Stage 1: Preprocessing - Clean and prepare text
-2. Stage 2: Classification - Classify as pedagogical/nonsensical
-3. Stage 3: Topic Modeling - Identify themes (BERTopic)
-4. Stage 4: Problem Detection - Detect learning problems (RoBERTa)
-5. Stage 5: Strategy Mapping - Map problems to teaching strategies
+2. Stage 2: Classification - Pedagogical vs Nonsensical (delegated to MCP)
+3. Stage 3: Topic Modeling - Deprecated locally; optional external/MCP ABSA
+4. Stage 4: Problem Detection - ABSA (aspect/issue/polarity) via MCP
+5. Stage 5: Strategy Mapping - Map problems to teaching strategies (MCP)
 
 The pipeline processes feedback messages and produces structured output
-with classifications, topics, problems, and recommended strategies.
+with classifications, ABSA fields, and recommended strategies. Local heavy
+model implementations (BERTopic, local RoBERTa/BERT) were replaced by thin
+MCP client wrappers; this file documents the updated stages for clarity.
 
 Usage:
     from pipelines.run_full_pipeline import run_pipeline
     
     results = run_pipeline(messages)
 """
+
+# Ensure `src` package can be imported when running this script from the repository root.
+# Adds the ai-pipeline directory to sys.path so `import src...` resolves reliably.
+import os
+import sys
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+# ai-pipeline root (one level up from pipelines/)
+_PROJECT_ROOT = os.path.abspath(os.path.join(_THIS_DIR, ".."))
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+
 
 import logging
 from typing import Dict, List, Optional, Any
@@ -45,16 +58,17 @@ class PipelineResult:
     classification_confidence: float = 0.0
     classification_method: str = ""
     
-    # Stage 3: Topic modeling
-    topic_id: int = -1
-    topic_label: str = ""
-    topic_probability: float = 0.0
-    
-    # Stage 4: Problem detection
+    # Stage 4: Problem detection (ABSA)
+    aspect: Optional[str] = None
     problem: str = ""
+    polarity: Optional[str] = None
     problem_confidence: float = 0.0
     
-    # Stage 5: Strategy mapping
+    # Stage 5: Cognitive Mapping
+    rbt_level: str = ""
+    clt_type: str = ""
+
+    # Stage 6: Strategy mapping (CBR)
     primary_strategy: str = ""
     all_strategies: List[str] = field(default_factory=list)
     
@@ -77,10 +91,12 @@ class PipelineSummary:
 
 # Import pipeline stages
 from src.preprocessing import preprocess
-from src.classification import classify_single, ClassificationLabel
-from src.topic_modeling import assign_topics, get_topic_info
-from src.problem_detection import detect_problem
-from src.strategy_mapping import get_recommended_strategy
+from src.cognitive import get_cognitive_mapping
+
+# Local logic modules
+from src.classification import classify
+from src.absa import extract_absa
+from src.cbr import get_strategy
 
 
 # Global topic model state (for incremental processing)
@@ -109,18 +125,21 @@ def initialize_topic_model():
 
 
 def process_single_message(
-    text: str,
-    skip_topics: bool = False
-) -> PipelineResult:
+    text: str
+) -> Optional[PipelineResult]:
     """
     Process a single message through the full pipeline.
     
-    Args:
-        text: Input message text
-        skip_topics: Skip topic modeling (for single messages)
-        
+    Sequential Logic:
+    1. Preprocessing
+    2. Classification (Pedagogical vs Nonsensical) -> Discard if False
+    3. ABSA (Aspect, Issue, Polarity)
+    4. Polarity Filter -> Discard if NOT Negative
+    5. Cognitive Mapping (RBT, CLT)
+    6. Strategy Mapping (CBR)
+    
     Returns:
-        PipelineResult with all analysis results
+        PipelineResult with analysis status.
     """
     import time
     start_time = time.time()
@@ -140,50 +159,51 @@ def process_single_message(
     
     # Stage 2: Classification
     try:
-        classification = classify_single(result.cleaned_text)
-        result.is_pedagogical = classification.label == ClassificationLabel.PEDAGOGICAL
-        result.classification_confidence = classification.confidence
-        result.classification_method = classification.model_used
+        classification = classify(result.cleaned_text)
+        result.is_pedagogical = True if classification.label == "pedagogical" else False
+        result.classification_confidence = float(classification.confidence or 0.0)
+        result.classification_method = getattr(classification, "model_used", "local")
     except Exception as e:
         errors.append(f"Classification error: {e}")
         result.stage_errors.append(f"Stage 2 (Classification): {e}")
     
-    # Only continue if pedagogical
+    # Step 1: Discard if not pedagogical
     if not result.is_pedagogical:
-        result.processing_time_ms = (time.time() - start_time) * 1000
         return result
     
-    # Stage 3: Topic Modeling (only for pedagogical content)
-    if not skip_topics and _topic_model_ready:
-        try:
-            topic_results = assign_topics([result.cleaned_text])
-            if topic_results:
-                result.topic_id = topic_results[0].topic_id
-                result.topic_label = topic_results[0].topic_label
-                result.topic_probability = topic_results[0].topic_probability
-        except Exception as e:
-            errors.append(f"Topic modeling error: {e}")
-            result.stage_errors.append(f"Stage 3 (Topic Modeling): {e}")
-    
-    # Stage 4: Problem Detection (only for pedagogical content)
+    # Stage 4: Problem Detection (ABSA)
     try:
-        problem_result = detect_problem(result.cleaned_text)
-        result.problem = problem_result.problem
-        result.problem_confidence = problem_result.confidence
+        problem_result = extract_absa(result.cleaned_text)
+        result.aspect = getattr(problem_result, "aspect", None)
+        result.polarity = getattr(problem_result, "polarity", "neutral")
+        result.problem = getattr(problem_result, "issue", None) or (result.aspect or "")
+        result.problem_confidence = float(getattr(problem_result, "confidence", 0.0) or 0.0)
     except Exception as e:
         errors.append(f"Problem detection error: {e}")
         result.stage_errors.append(f"Stage 4 (Problem Detection): {e}")
     
-    # Stage 5: Strategy Mapping
+    # Step 2: Discard if NOT negative (Rule: Only negative feedback indicates a need for enhancement)
+    if result.polarity != "negative":
+        return result
+    
+    # Stage 5: Cognitive Mapping (RBT + CLT)
+    try:
+        rbt, clt = get_cognitive_mapping(result.problem, result.aspect)
+        result.rbt_level = rbt
+        result.clt_type = clt
+    except Exception as e:
+        errors.append(f"Cognitive mapping error: {e}")
+        result.stage_errors.append(f"Stage 5 (Cognitive Mapping): {e}")
+
+    # Stage 6: Strategy Mapping (CBR)
     if result.problem:
         try:
-            # Use RoBERTa to get the recommended strategy
-            strategy_result = get_recommended_strategy(result.problem, result.cleaned_text)
-            result.all_strategies = [strategy_result.strategy]  # Single strategy as list
-            result.primary_strategy = strategy_result.strategy
+            strategy_result = get_strategy(result.aspect, result.problem, result.cleaned_text)
+            result.all_strategies = [strategy_result.strategy] if strategy_result and strategy_result.strategy else []
+            result.primary_strategy = strategy_result.strategy if strategy_result and strategy_result.strategy else ""
         except Exception as e:
             errors.append(f"Strategy mapping error: {e}")
-            result.stage_errors.append(f"Stage 5 (Strategy Mapping): {e}")
+            result.stage_errors.append(f"Stage 6 (Strategy Mapping): {e}")
     
     result.processing_time_ms = (time.time() - start_time) * 1000
     return result
@@ -225,12 +245,15 @@ def run_pipeline(
         
         result = process_single_message(message)
         
-        # Filter by pedagogical if requested
-        if return_only_pedagogical:
-            if result.is_pedagogical and result.classification_confidence >= min_classification_confidence:
+        result = process_single_message(message)
+        
+        # Only add valid results (pedagogical and negative) to results list
+        if result.is_pedagogical and result.polarity == "negative":
+            if return_only_pedagogical:
+                if result.classification_confidence >= min_classification_confidence:
+                    results.append(result)
+            else:
                 results.append(result)
-        else:
-            results.append(result)
     
     total_time = time.time() - start_time
     logger.info(f"Pipeline completed in {total_time:.2f} seconds")
@@ -255,10 +278,6 @@ def get_pipeline_summary(results: List[PipelineResult]) -> PipelineSummary:
     pedagogical_count = sum(1 for r in results if r.is_pedagogical)
     summary.pedagogical_count = pedagogical_count
     summary.nonsensical_count = len(results) - pedagogical_count
-    
-    # Count unique topics
-    topics = set(r.topic_id for r in results if r.topic_id != -1)
-    summary.unique_topics = len(topics)
     
     # Count unique problems
     problems = set(r.problem for r in results if r.problem)
@@ -294,11 +313,11 @@ def export_results_to_json(
             "is_pedagogical": result.is_pedagogical,
             "classification_confidence": result.classification_confidence,
             "classification_method": result.classification_method,
-            "topic_id": result.topic_id,
-            "topic_label": result.topic_label,
-            "topic_probability": result.topic_probability,
+            "aspect": result.aspect,
             "problem": result.problem,
             "problem_confidence": result.problem_confidence,
+            "rbt_level": result.rbt_level,
+            "clt_type": result.clt_type,
             "primary_strategy": result.primary_strategy,
             "all_strategies": result.all_strategies,
             "processing_time_ms": result.processing_time_ms,
@@ -315,22 +334,14 @@ def export_results_to_json(
 if __name__ == "__main__":
     # Sample messages for testing
     test_messages = [
-        # Pedagogical
-        "I don't understand this concept",
-        "Can you explain more clearly?",
-        "Can you give more examples?",
-        "Thank you po for the lesson!",
-        "Too fast, please slow down",
-        "What formula should I use?",
-        
-        # Nonsensical
-        "http://spam.com click here",
-        "OK",
-        "hello",
-        
-        # Mixed
-        "The explanation was helpful",
-        "Need more practice problems",
+        'Hello Woooorld!',
+        "I don't understand po yung example, tbh",
+        'THANK YOU PO!!!',
+        'mas mabilis pa yung sa example',
+        'http://example.com is a great resource 😀🤣😌',
+        'u r so good n smart, thx!',
+        'hndi q lng po kc gets yan',
+        'i understand na poooo haha',
     ]
     
     print("=" * 70)
@@ -338,35 +349,28 @@ if __name__ == "__main__":
     print("=" * 70)
     print()
     
-    # Run pipeline
-    results = run_pipeline(test_messages, return_only_pedagogical=False)
-    
-    # Print results
-    for result in results:
-        print(f"Original: {result.original_text}")
-        print(f"Cleaned:  {result.cleaned_text}")
-        print(f"Pedagogical: {result.is_pedagogical} (confidence: {result.classification_confidence:.2f})")
+    # Run pipeline and print individually
+    for message in test_messages:
+        result = process_single_message(message)
         
-        if result.is_pedagogical:
-            print(f"Topic: {result.topic_label} (ID: {result.topic_id})")
-            print(f"Problem: {result.problem} (confidence: {result.problem_confidence:.2f})")
-            print(f"Strategy: {result.primary_strategy}")
+        print(f"original: {result.original_text}")
+        print(f"cleaned: {result.cleaned_text}")
         
-        if result.stage_errors:
-            print(f"Errors: {result.stage_errors}")
+        cls_binary = 1 if result.is_pedagogical else 0
+        print(f"class: {cls_binary} ({result.classification_confidence:.2f})")
         
-        print(f"Processing time: {result.processing_time_ms:.1f}ms")
+        if not result.is_pedagogical:
+            print("!!! not pedagogical feedback")
+        elif result.polarity != "negative":
+            print(f"aspect: {result.aspect}")
+            print(f"issue: {result.problem}")
+            print(f"!!! not negative feedback")
+        else:
+            print(f"aspect: {result.aspect}")
+            print(f"issue: {result.problem}, ({result.rbt_level}, {result.clt_type})")
+            print(f"strat: {result.primary_strategy}")
+            
         print("-" * 70)
-    
-    # Summary
-    summary = get_pipeline_summary(results)
-    print()
-    print("Summary:")
-    print(f"  Total messages: {summary.total_messages}")
-    print(f"  Pedagogical: {summary.pedagogical_count}")
-    print(f"  Nonsensical: {summary.nonsensical_count}")
-    print(f"  Unique topics: {summary.unique_topics}")
-    print(f"  Unique problems: {summary.unique_problems}")
     
     print()
     print("Pipeline test completed!")

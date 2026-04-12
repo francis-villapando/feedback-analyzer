@@ -23,8 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 
-ai-pipeline-implementation-plan.md
-
 # Python
 __pycache__/
 *.py[cod]
@@ -53,3 +51,5 @@ htmlcov/
 
 .kilocode/
 plans/
+ai-pipeline/tests/test_preprocessing.py
+.playwright-mcp/
