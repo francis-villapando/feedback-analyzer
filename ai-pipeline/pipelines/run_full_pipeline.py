@@ -332,16 +332,13 @@ def export_results_to_json(
 
 # Test function
 if __name__ == "__main__":
-    # Sample messages for testing
+    # Sample messages for testing (using clean English to demonstrate baseline NLI capabilities)
     test_messages = [
-        'Hello Woooorld!',
-        "I don't understand po yung example, tbh",
-        'THANK YOU PO!!!',
-        'mas mabilis pa yung sa example',
-        'http://example.com is a great resource 😀🤣😌',
-        'u r so good n smart, thx!',
-        'hndi q lng po kc gets yan',
-        'i understand na poooo haha',
+        "It is too fast sir",
+        "The clarity of examples is bad",
+        "Hello classmates!",
+        "Your slides are beautiful",
+        "I do not understand the logic"
     ]
     
     print("=" * 70)
@@ -362,8 +359,6 @@ if __name__ == "__main__":
         if not result.is_pedagogical:
             print("!!! not pedagogical feedback")
         elif result.polarity != "negative":
-            print(f"aspect: {result.aspect}")
-            print(f"issue: {result.problem}")
             print(f"!!! not negative feedback")
         else:
             print(f"aspect: {result.aspect}")

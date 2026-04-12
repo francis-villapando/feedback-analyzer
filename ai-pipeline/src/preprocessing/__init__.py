@@ -72,7 +72,7 @@ MAX_TOKEN_LENGTH = 128
 def preprocess(
     text: str,
     tokenize_flag: bool = True,
-    spell_check: bool = True,
+    spell_check: bool = False,
     expand_abbrevs: bool = True,
     normalize_elongation: bool = True,
     remove_hashtags: bool = True,
@@ -173,8 +173,6 @@ def preprocess(
     if spell_check:
         tokens = correct_tokens(tokens)
         # Update cleaned_text after spelling correction/custom mapping
-        result["cleaned_text"] = detokenize(tokens)
-
     result["tokens"] = tokens
 
     # Step 7: XLM-RoBERTa encoding with truncation
