@@ -196,12 +196,12 @@ async def analyze_feedback(feedback: Feedback):
 
         print("[FA:AI] Running AI pipeline...")
 
-        # Run pipeline
-        results = run_pipeline([feedback.message], return_only_pedagogical=False)
+        # Run pipeline - return only pedagogical + negative feedback
+        results = run_pipeline([feedback.message], return_only_pedagogical=True)
 
         if not results:
-            print("[FA:AI] No results from pipeline")
-            return {"status": "error", "message": "No results from pipeline"}
+            print(f"[FA:AI] Message excluded by pipeline filter: {feedback.message[:30]}...")
+            return {"status": "excluded", "message": "Feedback was not pedagogical or negative"}
 
         result = results[0]
 
@@ -210,7 +210,7 @@ async def analyze_feedback(feedback: Feedback):
         )
         print(f"[FA:AI] Problem detected: {result.problem}")
         print(f"[FA:AI] Strategy recommended: {result.primary_strategy}")
-        print(f"[FA:AI] Topic: {result.topic_label}")
+        print(f"[FA:AI] Aspect: {result.aspect}")
 
         # Save analysis result to Supabase feedback_cases table
         case_data = {
@@ -221,12 +221,11 @@ async def analyze_feedback(feedback: Feedback):
             "tokens": result.tokens,
             "is_pedagogical": result.is_pedagogical,
             "classification_confidence": float(result.classification_confidence or 0.0),
-            # ABSA fields: aspect/issue/polarity. Aspect detection is optional for now.
-            "aspect": None,
+            "aspect": result.aspect,
             "issue": result.problem,
-            "polarity": ("negative" if result.problem_confidence and result.problem_confidence > 0.5 else ("neutral" if result.problem_confidence else None)),
-            "bloom_taxonomy": None,
-            "cognitive_load": None,
+            "polarity": result.polarity,
+            "bloom_taxonomy": result.rbt_level,
+            "cognitive_load": result.clt_type,
             "strategy": result.primary_strategy,
         }
 
@@ -268,9 +267,9 @@ async def analyze_feedback(feedback: Feedback):
             "classification_confidence": result.classification_confidence,
             "problem": result.problem,
             "strategy": result.primary_strategy,
-            "topic": result.topic_label,
-            "bloom_taxonomy": None,
-            "cognitive_load": None,
+            "aspect": result.aspect,
+            "bloom_taxonomy": result.rbt_level,
+            "cognitive_load": result.clt_type,
             "case_id": saved_id,
             "db_error": db_error,
             "errors": result.stage_errors,

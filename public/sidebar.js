@@ -59,49 +59,56 @@
     }
 
     feedbackContent.innerHTML = '';
-
     cases.forEach(c => {
-      const originalText = c.original_text || 'No feedback available';
-      const cleanedText = c.cleaned_text !== null && c.cleaned_text !== undefined ? c.cleaned_text : '-';
-      const aspect = (c.aspect || '-');
-      const issue = (c.issue || '-');
-      const bloomLevel = c.bloom_taxonomy || '-';
-      const cognitiveLoad = c.cognitive_load || '-';
-
-      const strategy = c.strategy || '-';
-
-      const entry = document.createElement('div');
-      entry.className = 'jai-feedback-card';
-
-      // Always display badges for Bloom and Cognitive Load, even if '-'
-      const bloomBadge = `<span class="jai-badge" title="Difficulty Type">Difficulty Type: ${escapeHtml(bloomLevel)}</span>`;
-      const loadBadge = `<span class="jai-badge" title="Cause">Cause: ${escapeHtml(cognitiveLoad)}</span>`;
-
-      entry.innerHTML = `
-        <div class="jai-card-primary">
-          <div class="jai-card-quote">"${escapeHtml(cleanedText !== '-' ? cleanedText : originalText)}"</div>
-        </div>
-        <table class="jai-table">
-          <tr>
-            <td class="jai-table-value">${escapeHtml(aspect)}</td>
-          </tr>
-          <tr>
-            <td class="jai-table-value">
-              <div style="color: #FF8A80; margin-bottom: 8px;">${escapeHtml(issue)}</div>
-              <div style="display: flex; gap: 4px; flex-wrap: wrap;">
-                ${bloomBadge}
-                ${loadBadge}
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td class="jai-table-strategy">${escapeHtml(strategy)}</td>
-          </tr>
-        </table>
-      `;
-
-      feedbackContent.appendChild(entry);
+      const card = createFeedbackCard(c);
+      if (card) feedbackContent.appendChild(card);
     });
+  }
+
+  function createFeedbackCard(data) {
+    // Normalization logic to handle both Supabase (db) and AI Result (json) formats
+    const originalText = data.original_text || data.original || 'No feedback available';
+    const cleanedText = data.cleaned_text || '-';
+    const aspect = data.aspect || data.topic || data.topic_label || '-';
+    const issue = data.issue || data.problem || '-';
+    const bloomLevel = data.bloom_taxonomy || data.bloom_level || data.bloom || '-';
+    const cognitiveLoad = data.cognitive_load || data.cognitiveLoad || '-';
+    const strategy = data.strategy || data.primary_strategy || '-';
+
+    // If it's a social/nonsensical chat that got through, we might skip it here 
+    // but the pipeline usually filters it out.
+    
+    const entry = document.createElement('div');
+    entry.className = 'jai-feedback-card';
+
+    const bloomBadge = `<span class="jai-badge" title="Difficulty Type">${escapeHtml(bloomLevel)}</span>`;
+    const loadBadge = `<span class="jai-badge" title="Cause">${escapeHtml(cognitiveLoad)}</span>`;
+
+    const formattedIssue = issue.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+
+    entry.innerHTML = `
+      <div class="jai-card-primary">
+        <div class="jai-card-quote">"${escapeHtml(cleanedText !== '-' ? cleanedText : originalText)}"</div>
+      </div>
+      <table class="jai-table">
+        <tr>
+          <td class="jai-table-value">${escapeHtml(aspect)}</td>
+        </tr>
+        <tr>
+          <td class="jai-table-value">
+            <div style="color: #FF8A80; margin-bottom: 8px;">${escapeHtml(formattedIssue)}</div>
+            <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+              ${bloomBadge}
+              ${loadBadge}
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td class="jai-table-strategy">${escapeHtml(strategy)}</td>
+        </tr>
+      </table>
+    `;
+    return entry;
   }
 
   function setProcessStatus(status) {
@@ -135,51 +142,18 @@
     }
 
     // Handle both single result and array of results
-    const results = Array.isArray(result) ? result : [result];
+    const results = (Array.isArray(result) ? result : [result]).filter(r => r.status !== 'excluded');
+    
+    if (results.length === 0) {
+      console.log('[FA:UI] All results were excluded, nothing to display');
+      return;
+    }
+
     console.log('[FA:UI] Processing', results.length, 'results');
 
     results.forEach(r => {
-      // Mapping from server response: original, cleaned_text, tokens, problem (issue), strategy, topic (aspect)
-      const originalText = r.original || r.original_text || 'No feedback available';
-      const cleanedText = r.cleaned_text || '-';
-      const aspect = r.topic || r.topic_label || r.aspect || '-';
-      const issue = r.problem || r.issue || '-';
-      const bloomLevel = r.bloom_level ?? r.bloom_taxonomy ?? r.bloom ?? '-';
-      const cognitiveLoad = r.cognitive_load ?? r.cognitiveLoad ?? '-';
-
-      const strategy = r.strategy || r.primary_strategy || '-';
-
-      const entry = document.createElement('div');
-      entry.className = 'jai-feedback-card';
-
-      // Always display badges for Bloom and Cognitive Load, even if '-'
-      const bloomBadge = `<span class="jai-badge" title="Difficulty Type">Difficulty Type: ${escapeHtml(bloomLevel)}</span>`;
-      const loadBadge = `<span class="jai-badge" title="Cause">Cause: ${escapeHtml(cognitiveLoad)}</span>`;
-
-      entry.innerHTML = `
-        <div class="jai-card-primary">
-          <div class="jai-card-quote">"${escapeHtml(cleanedText !== '-' ? cleanedText : originalText)}"</div>
-        </div>
-        <table class="jai-table">
-          <tr>
-            <td class="jai-table-value">${escapeHtml(aspect)}</td>
-          </tr>
-          <tr>
-            <td class="jai-table-value">
-              <div style="color: #FF8A80; margin-bottom: 8px;">${escapeHtml(issue)}</div>
-              <div style="display: flex; gap: 4px; flex-wrap: wrap;">
-                ${bloomBadge}
-                ${loadBadge}
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td class="jai-table-strategy">${escapeHtml(strategy)}</td>
-          </tr>
-        </table>
-      `;
-
-      feedbackContent.appendChild(entry);
+      const card = createFeedbackCard(r);
+      if (card) feedbackContent.appendChild(card);
     });
   }
 
@@ -410,7 +384,6 @@
         </div>
       </div>
       <div class="jai-bottom-bar">
-        <div id="jai-process-status" class="jai-process-status idle">${PROCESS_STATUS.IDLE}</div>
         <div class="jai-ai-disclaimer">AI can make mistakes. Please verify important information.</div>
       </div>
     `;

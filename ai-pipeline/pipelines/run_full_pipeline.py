@@ -334,11 +334,11 @@ def export_results_to_json(
 if __name__ == "__main__":
     # Sample messages for testing (using clean English to demonstrate baseline NLI capabilities)
     test_messages = [
-        "It is too fast sir",
-        "The clarity of examples is bad",
-        "Hello classmates!",
-        "Your slides are beautiful",
-        "I do not understand the logic"
+        "The logic of deleting a node from a BST is too fast",
+        "Can you provide another example of a Circular Linked List?",
+        "I dont understand how the stack pointer moves",
+        "The Big O notation explanation is too complex",
+        "Your code editor looks beautiful"
     ]
     
     print("=" * 70)

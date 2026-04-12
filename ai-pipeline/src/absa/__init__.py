@@ -39,17 +39,23 @@ def extract_absa(text: str) -> ProblemResult:
             return ProblemResult(aspect=None, issue=None, polarity=polarity, confidence=pol_result['scores'][0])
 
         # Stage A: Aspect Identification
-        aspect_labels = ["pace of session", "clarity of examples", "content difficulty", "technical issues", "instruction quality"]
+        aspect_labels = [
+            "instructional pacing and speed", 
+            "content difficulty and logic", 
+            "clarity of examples and slides", 
+            "technical connection and audio", 
+            "social conversation"
+        ]
         asp_result = classifier(text, aspect_labels)
         aspect = asp_result['labels'][0]
         
         # Stage C: Issue Identification
         issue_map = {
-            "pace of session": ["too fast", "too slow"],
-            "clarity of examples": ["unclear example", "need more examples"],
-            "content difficulty": ["not understand", "too complex"],
-            "technical issues": ["audio problem", "video problem"],
-            "instruction quality": ["unclear instructions"]
+            "instructional pacing and speed": ["too fast", "too slow"],
+            "clarity of examples and slides": ["unclear example", "need more examples"],
+            "content difficulty and logic": ["not understand", "too complex"],
+            "technical connection and audio": ["audio problem", "video problem"],
+            "social conversation": ["off topic"]
         }
         
         possible_issues = issue_map.get(aspect, [])
